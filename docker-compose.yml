@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mekano-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mekano
+      POSTGRES_PASSWORD: mekano
+      POSTGRES_DB: mekano
+    ports:
+      - "5432:5432"
+    volumes:
+      - mekano_pg:/var/lib/postgresql/data
+
+volumes:
+  mekano_pg:

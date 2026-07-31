@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Mekano",
+    "slug": "mekano",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/mekano-logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/mekano-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D7377"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.mekano.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Mekano utilise votre position pour trouver les garages proches."
+      }
+    },
+    "android": {
+      "package": "app.mekano.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0D7377",
+        "foregroundImage": "./assets/mekano-logo.png"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Autoriser Mekano à utiliser votre position pour trouver des garages à proximité."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "web": {
+      "favicon": "./assets/mekano-logo.png"
+    }
+  }
+}
