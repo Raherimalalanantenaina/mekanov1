@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import {
+  Camera,
+  GeoJSONSource,
+  Layer,
+  Map as MapLibreMap,
+  Marker,
+  type CameraRef,
+} from '@maplibre/maplibre-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +16,7 @@ import { fetchRoute, LatLng, RouteResult } from '../api/client';
 import { BouncyPressable } from '../components/Pressable';
 import { UserLocationMarker } from '../components/UserLocationMarker';
 import { useTheme } from '../context/ThemeContext';
+import { OSM_STYLE, boundsOf, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -19,7 +27,7 @@ export function RouteScreen({ route, navigation }: Props) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const mapRef = useRef<MapView>(null);
+  const cameraRef = useRef<CameraRef>(null);
   const [userPos, setUserPos] = useState<LatLng | null>(null);
   const [result, setResult] = useState<RouteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +50,13 @@ export function RouteScreen({ route, navigation }: Props) {
       const r = await fetchRoute(from, destination);
       setResult(r);
       setTimeout(() => {
-        mapRef.current?.fitToCoordinates([from, destination, ...r.coords], {
-          edgePadding: { top: 120, bottom: 200, left: 60, right: 60 },
-          animated: true,
-        });
+        cameraRef.current?.fitBounds(
+          boundsOf([from, destination, ...r.coords]),
+          {
+            padding: { top: 120, bottom: 200, left: 60, right: 60 },
+            duration: 800,
+          }
+        );
       }, 400);
     })().catch(() =>
       setError('Impossible de calculer l’itinéraire pour le moment.')
@@ -55,45 +66,72 @@ export function RouteScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        initialRegion={{
-          latitude,
-          longitude,
-          latitudeDelta: 0.1,
-          longitudeDelta: 0.1,
-        }}
-        showsUserLocation={false}
-      >
+      <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={OSM_STYLE}>
+        <Camera
+          ref={cameraRef}
+          initialViewState={{
+            center: [longitude, latitude],
+            zoom: zoomForDelta(0.1),
+          }}
+        />
+
+        {result && (
+          <GeoJSONSource
+            id="route"
+            data={{
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'LineString',
+                coordinates: result.coords.map((c) => [
+                  c.longitude,
+                  c.latitude,
+                ]),
+              },
+            }}
+          >
+            {/* Liseré blanc dessous pour le contraste */}
+            <Layer
+              id="route-casing"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{
+                'line-color': '#FFFFFF',
+                'line-width': 11,
+                ...(result.straightLine
+                  ? { 'line-dasharray': [1.2, 1] }
+                  : {}),
+              }}
+            />
+            <Layer
+              id="route-line"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{
+                'line-color': '#0E7C86',
+                'line-width': 6,
+                ...(result.straightLine
+                  ? { 'line-dasharray': [1.2, 1] }
+                  : {}),
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
         {userPos && (
-          <Marker coordinate={userPos} anchor={{ x: 0.5, y: 0.5 }} zIndex={10}>
+          <Marker
+            lngLat={[userPos.longitude, userPos.latitude]}
+            anchor="center"
+          >
             <UserLocationMarker />
           </Marker>
         )}
-        <Marker coordinate={destination}>
+        <Marker lngLat={[longitude, latitude]} anchor="center">
           <View style={styles.destMarker}>
             <Ionicons name="construct" size={15} color={colors.tealDeep} />
           </View>
         </Marker>
-        {result && (
-          <>
-            {/* Liseré blanc dessous pour le contraste */}
-            <Polyline
-              coordinates={result.coords}
-              strokeColor="#FFFFFF"
-              strokeWidth={11}
-              lineDashPattern={result.straightLine ? [12, 10] : undefined}
-            />
-            <Polyline
-              coordinates={result.coords}
-              strokeColor="#0E7C86"
-              strokeWidth={6}
-              lineDashPattern={result.straightLine ? [12, 10] : undefined}
-            />
-          </>
-        )}
-      </MapView>
+      </MapLibreMap>
 
       {/* Retour */}
       <BouncyPressable

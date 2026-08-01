@@ -10,13 +10,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REMPLACE-PAR-TON-URL-API"
+        "EXPO_PUBLIC_API_URL": "https://mekanov1.onrender.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REMPLACE-PAR-TON-URL-API"
+        "EXPO_PUBLIC_API_URL": "https://mekanov1.onrender.com"
       }
     }
   },

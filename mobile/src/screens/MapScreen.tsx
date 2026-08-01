@@ -8,7 +8,14 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import MapView, { Circle, Marker } from 'react-native-maps';
+import {
+  Camera,
+  GeoJSONSource,
+  Layer,
+  Map as MapLibreMap,
+  Marker,
+  type CameraRef,
+} from '@maplibre/maplibre-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -21,16 +28,12 @@ import { BouncyPressable } from '../components/Pressable';
 import { UserLocationMarker } from '../components/UserLocationMarker';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { OSM_STYLE, circlePolygon, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 
-const DEFAULT_REGION = {
-  latitude: -18.8792,
-  longitude: 47.5079,
-  latitudeDelta: 0.12,
-  longitudeDelta: 0.12,
-};
+const DEFAULT_CENTER: [number, number] = [47.5079, -18.8792];
 
 const RADIUS_OPTIONS = [1, 3, 5, 10] as const;
 
@@ -57,7 +60,7 @@ export function MapScreen() {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const mapRef = useRef<MapView>(null);
+  const cameraRef = useRef<CameraRef>(null);
   const [garages, setGarages] = useState<Garage[]>([]);
   const [selected, setSelected] = useState<Garage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,15 +86,11 @@ export function MapScreen() {
             lat = pos.coords.latitude;
             lng = pos.coords.longitude;
             setUserPos({ latitude: lat, longitude: lng });
-            mapRef.current?.animateToRegion(
-              {
-                latitude: lat,
-                longitude: lng,
-                latitudeDelta: 0.08,
-                longitudeDelta: 0.08,
-              },
-              800
-            );
+            cameraRef.current?.easeTo({
+              center: [lng, lat],
+              zoom: zoomForDelta(0.08),
+              duration: 800,
+            });
           }
           const data = await fetchGarages({ lat, lng });
           setGarages(data.garages);
@@ -144,53 +143,64 @@ export function MapScreen() {
     setSelected(null);
     if (r != null && userPos) {
       const delta = (r * 2.6) / 111;
-      mapRef.current?.animateToRegion(
-        { ...userPos, latitudeDelta: delta, longitudeDelta: delta },
-        600
-      );
+      cameraRef.current?.easeTo({
+        center: [userPos.longitude, userPos.latitude],
+        zoom: zoomForDelta(delta),
+        duration: 600,
+      });
     }
   };
 
   const focusGarage = (g: Garage) => {
     setSelected(g);
-    mapRef.current?.animateToRegion(
-      {
-        latitude: g.latitude,
-        longitude: g.longitude,
-        latitudeDelta: 0.03,
-        longitudeDelta: 0.03,
-      },
-      600
-    );
+    cameraRef.current?.easeTo({
+      center: [g.longitude, g.latitude],
+      zoom: zoomForDelta(0.03),
+      duration: 600,
+    });
   };
 
   return (
     <View style={styles.root}>
-      <MapView
-        ref={mapRef}
+      <MapLibreMap
         style={StyleSheet.absoluteFill}
-        initialRegion={DEFAULT_REGION}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
+        mapStyle={OSM_STYLE}
         onPress={() => setSelected(null)}
       >
-        {/* Cercle rouge du rayon de recherche */}
+        <Camera
+          ref={cameraRef}
+          initialViewState={{
+            center: DEFAULT_CENTER,
+            zoom: zoomForDelta(0.12),
+          }}
+        />
+
+        {/* Cercle du rayon de recherche */}
         {radiusKm != null && userPos && (
-          <Circle
-            center={userPos}
-            radius={radiusKm * 1000}
-            strokeColor="rgba(18,113,122,0.8)"
-            strokeWidth={2}
-            fillColor="rgba(18,113,122,0.08)"
-          />
+          <GeoJSONSource
+            id="radius-circle"
+            data={circlePolygon(userPos, radiusKm)}
+          >
+            <Layer
+              id="radius-fill"
+              type="fill"
+              paint={{ 'fill-color': 'rgba(18,113,122,0.08)' }}
+            />
+            <Layer
+              id="radius-line"
+              type="line"
+              paint={{
+                'line-color': 'rgba(18,113,122,0.8)',
+                'line-width': 2,
+              }}
+            />
+          </GeoJSONSource>
         )}
 
         {userPos && (
           <Marker
-            coordinate={userPos}
-            anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={10}
-            tracksViewChanges
+            lngLat={[userPos.longitude, userPos.latitude]}
+            anchor="center"
           >
             <UserLocationMarker />
           </Marker>
@@ -202,9 +212,9 @@ export function MapScreen() {
           return (
             <Marker
               key={g.id}
-              coordinate={{ latitude: g.latitude, longitude: g.longitude }}
+              lngLat={[g.longitude, g.latitude]}
+              anchor="center"
               onPress={() => focusGarage(g)}
-              zIndex={isNearest ? 9 : 1}
             >
               <View collapsable={false} style={styles.markerWrap}>
                 <View
@@ -226,7 +236,7 @@ export function MapScreen() {
             </Marker>
           );
         })}
-      </MapView>
+      </MapLibreMap>
 
       {/* Bandeau haut : recherche + compteur + rayon */}
       <View style={[styles.topBar, { top: insets.top + 8 }]}>
@@ -325,10 +335,11 @@ export function MapScreen() {
       {userPos && (
         <BouncyPressable
           onPress={() =>
-            mapRef.current?.animateToRegion(
-              { ...userPos, latitudeDelta: 0.05, longitudeDelta: 0.05 },
-              600
-            )
+            cameraRef.current?.easeTo({
+              center: [userPos.longitude, userPos.latitude],
+              zoom: zoomForDelta(0.05),
+              duration: 600,
+            })
           }
           style={[styles.locateBtn, shadow.float, { bottom: 118 + insets.bottom }]}
         >
