@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   ScrollView,
@@ -32,6 +33,7 @@ import {
 import { HeroDecor } from '../components/HeroDecor';
 import { BouncyPressable } from '../components/Pressable';
 import { useTheme } from '../context/ThemeContext';
+import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
 import { font, gradients, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage, Review } from '../types';
@@ -159,7 +161,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
 
   const onSubmitReview = async () => {
     if (!rName.trim()) {
-      Alert.alert('Nom requis');
+      Alert.alert(t('nameRequired'));
       return;
     }
     try {
@@ -172,15 +174,15 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       setGarage(await fetchGarageById(id));
       setShowReview(false);
       setRComment('');
-      Alert.alert('Merci', 'Ton avis a été publié.');
+      Alert.alert(t('thanks'), t('reviewPublished'));
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
   const onSubmitQuote = async () => {
     if (!qName.trim() || !qDesc.trim()) {
-      Alert.alert('Champs requis', 'Nom et description sont obligatoires.');
+      Alert.alert(t('requiredFields'), t('nameDescRequired'));
       return;
     }
     try {
@@ -194,15 +196,15 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       setShowQuote(false);
       setQDesc('');
       setQPhoto('');
-      Alert.alert('Envoyé', 'Le garage a reçu ta demande de devis.');
+      Alert.alert(t('sent'), t('quoteSent'));
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
   const onSubmitBooking = async () => {
     if (!bName.trim()) {
-      Alert.alert('Champs requis', 'Ton nom est obligatoire.');
+      Alert.alert(t('requiredFields'), t('yourNameRequired'));
       return;
     }
     const slot = `${bDate.toLocaleDateString('fr-FR')} à ${bDate.toLocaleTimeString(
@@ -219,9 +221,9 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       });
       setShowBooking(false);
       setBNote('');
-      Alert.alert('Envoyé', 'Demande de rendez-vous transmise au garage.');
+      Alert.alert(t('sent'), t('bookingSent'));
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
@@ -280,7 +282,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             style={[
               styles.statusPill,
               {
-                backgroundColor: garage.isOpen
+                backgroundColor: isOpenNow(garage)
                   ? 'rgba(30,158,106,0.3)'
                   : 'rgba(214,69,65,0.3)',
               },
@@ -288,12 +290,14 @@ export function GarageDetailScreen({ route, navigation }: Props) {
           >
             <Text
               style={{
-                color: garage.isOpen ? '#8FEFC2' : '#FFB3AF',
+                color: isOpenNow(garage) ? '#8FEFC2' : '#FFB3AF',
                 fontSize: 11.5,
                 fontWeight: font.bold,
               }}
             >
-              {garage.isOpen ? `● ${t('open')}` : `● ${t('closed')}`}
+              {isOpenNow(garage)
+                ? `● ${t('openNowBadge')}`
+                : `● ${t('closedNowBadge')}`}
             </Text>
           </View>
         </View>
@@ -307,7 +311,10 @@ export function GarageDetailScreen({ route, navigation }: Props) {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: pad, paddingBottom: 40 }}
+        contentContainerStyle={{
+          padding: pad,
+          paddingBottom: 40 + insets.bottom,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {garage.photos?.length > 0 && (
@@ -340,14 +347,29 @@ export function GarageDetailScreen({ route, navigation }: Props) {
         )}
 
         <InfoRow icon="location-outline" label={t('address')} value={garage.address} />
-        <InfoRow icon="time-outline" label={t('hours')} value={garage.openingHours} />
+        <InfoRow
+          icon="time-outline"
+          label={t('hours')}
+          value={
+            garage.hoursJson?.length === 7
+              ? garage.hoursJson
+                  .map((d, i) => {
+                    const day = t('daysShort').split(',')[i];
+                    return d.closed
+                      ? `${day} — ${t('closedDay')}`
+                      : `${day} ${d.open}–${d.close}`;
+                  })
+                  .join('\n')
+              : garage.openingHours
+          }
+        />
         <InfoRow
           icon="build-outline"
           label={t('services')}
           value={
             garage.services?.length
               ? garage.services.join(' · ')
-              : 'Non renseignés'
+              : t('notProvided')
           }
         />
 
@@ -444,7 +466,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
           </Text>
         </View>
         {reviews.length === 0 ? (
-          <Text style={styles.emptyReviews}>Aucun avis pour l’instant</Text>
+          <Text style={styles.emptyReviews}>{t('noReviews')}</Text>
         ) : (
           reviews.map((r) => (
             <View key={r.id} style={[styles.reviewCard, shadow.card]}>
@@ -464,8 +486,8 @@ export function GarageDetailScreen({ route, navigation }: Props) {
 
       {/* ===== Modal Avis ===== */}
       <Modal visible={showReview} transparent animationType="slide">
-        <View style={styles.modalBg}>
-          <View style={styles.modal}>
+        <KeyboardAvoidingView style={styles.modalBg} behavior="padding">
+          <View style={[styles.modal, { paddingBottom: 24 + insets.bottom }]}>
             <Text style={styles.modalTitle}>{t('addReview')}</Text>
             <TextInput
               style={styles.field}
@@ -497,16 +519,16 @@ export function GarageDetailScreen({ route, navigation }: Props) {
               <Text style={styles.modalBtnText}>{t('send')}</Text>
             </BouncyPressable>
             <Text style={styles.cancel} onPress={() => setShowReview(false)}>
-              Annuler
+              {t('cancel')}
             </Text>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ===== Modal Devis ===== */}
       <Modal visible={showQuote} transparent animationType="slide">
-        <View style={styles.modalBg}>
-          <View style={styles.modal}>
+        <KeyboardAvoidingView style={styles.modalBg} behavior="padding">
+          <View style={[styles.modal, { paddingBottom: 24 + insets.bottom }]}>
             <Text style={styles.modalTitle}>{t('quote')}</Text>
             <TextInput
               style={styles.field}
@@ -534,23 +556,23 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             <BouncyPressable onPress={pickQuotePhoto} style={styles.photoPick}>
               <Ionicons name="camera-outline" size={16} color={colors.teal} />
               <Text style={{ color: colors.teal, fontWeight: font.bold }}>
-                {qPhoto ? 'Photo ajoutée' : 'Ajouter une photo'}
+                {qPhoto ? t('photoAdded') : t('addPhoto')}
               </Text>
             </BouncyPressable>
             <BouncyPressable onPress={onSubmitQuote} style={styles.modalBtn}>
               <Text style={styles.modalBtnText}>{t('send')}</Text>
             </BouncyPressable>
             <Text style={styles.cancel} onPress={() => setShowQuote(false)}>
-              Annuler
+              {t('cancel')}
             </Text>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ===== Modal RDV ===== */}
       <Modal visible={showBooking} transparent animationType="slide">
-        <View style={styles.modalBg}>
-          <View style={styles.modal}>
+        <KeyboardAvoidingView style={styles.modalBg} behavior="padding">
+          <View style={[styles.modal, { paddingBottom: 24 + insets.bottom }]}>
             <Text style={styles.modalTitle}>{t('booking')}</Text>
             <TextInput
               style={styles.field}
@@ -612,10 +634,10 @@ export function GarageDetailScreen({ route, navigation }: Props) {
               <Text style={styles.modalBtnText}>{t('send')}</Text>
             </BouncyPressable>
             <Text style={styles.cancel} onPress={() => setShowBooking(false)}>
-              Annuler
+              {t('cancel')}
             </Text>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

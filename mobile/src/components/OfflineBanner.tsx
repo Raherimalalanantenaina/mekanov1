@@ -3,10 +3,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../i18n';
 import { font, type ThemeColors } from '../theme';
 
 export function OfflineBanner({ offline }: { offline: boolean }) {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   if (!offline) return null;
   return (
@@ -17,7 +19,7 @@ export function OfflineBanner({ offline }: { offline: boolean }) {
     >
       <View style={styles.row}>
         <Ionicons name="cloud-offline-outline" size={16} color={colors.offline} />
-        <Text style={styles.text}>Mode hors ligne — données en cache</Text>
+        <Text style={styles.text}>{t('offline')}</Text>
       </View>
     </Animated.View>
   );

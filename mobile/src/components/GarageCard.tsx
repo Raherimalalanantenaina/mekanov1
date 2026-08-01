@@ -4,6 +4,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { BouncyPressable } from './Pressable';
 import { useTheme } from '../context/ThemeContext';
+import { isOpenNow } from '../hours';
+import { useI18n } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
 
@@ -49,6 +51,7 @@ export function GarageCard({
   onToggleFavorite,
 }: Props) {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <Animated.View entering={FadeInDown.duration(320)}>
@@ -107,7 +110,7 @@ export function GarageCard({
             style={[
               styles.badge,
               {
-                backgroundColor: garage.isOpen
+                backgroundColor: isOpenNow(garage)
                   ? colors.successSoft
                   : colors.dangerSoft,
               },
@@ -117,7 +120,7 @@ export function GarageCard({
               style={[
                 styles.dot,
                 {
-                  backgroundColor: garage.isOpen
+                  backgroundColor: isOpenNow(garage)
                     ? colors.success
                     : colors.danger,
                 },
@@ -125,18 +128,18 @@ export function GarageCard({
             />
             <Text
               style={{
-                color: garage.isOpen ? colors.success : colors.danger,
+                color: isOpenNow(garage) ? colors.success : colors.danger,
                 fontSize: 10.5,
                 fontWeight: font.bold,
               }}
             >
-              {garage.isOpen ? 'Ouvert' : 'Fermé'}
+              {isOpenNow(garage) ? t('openNowBadge') : t('closedNowBadge')}
             </Text>
           </View>
           {garage.mobileService && (
             <View style={styles.mobileBadge}>
               <Ionicons name="car" size={10} color={colors.teal} />
-              <Text style={styles.mobileText}>Se déplace</Text>
+              <Text style={styles.mobileText}>{t('movesAround')}</Text>
             </View>
           )}
           {garage.services?.slice(0, 1).map((s) => (

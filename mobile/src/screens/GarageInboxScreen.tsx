@@ -21,6 +21,7 @@ import { ChatThread } from '../components/ChatThread';
 import { BouncyPressable } from '../components/Pressable';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Appointment, Quote, QuoteMessage } from '../types';
 
@@ -29,6 +30,7 @@ type Tab = 'quotes' | 'bookings';
 export function GarageInboxScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('quotes');
@@ -49,7 +51,7 @@ export function GarageInboxScreen() {
       setQuotes(q);
       setAppts(a);
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     } finally {
       setLoading(false);
     }
@@ -64,9 +66,7 @@ export function GarageInboxScreen() {
   if (!user) {
     return (
       <View style={[styles.root, styles.center]}>
-        <Text style={styles.hint}>
-          Connecte-toi pour voir les devis et rendez-vous reçus.
-        </Text>
+        <Text style={styles.hint}>{t('inboxLoginHint')}</Text>
       </View>
     );
   }
@@ -87,6 +87,13 @@ export function GarageInboxScreen() {
     await reload();
   };
 
+  const statusLabel = (s: string) => {
+    if (s === 'answered') return t('answered');
+    if (s === 'accepted') return t('accepted');
+    if (s === 'declined') return t('declined');
+    return t('pending');
+  };
+
   if (openQuote) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -105,9 +112,10 @@ export function GarageInboxScreen() {
         <ChatThread
           messages={messages}
           mySender="garage"
-          placeholder="Répondre au client…"
+          placeholder={t('replyToClient')}
           onSend={send}
           bottomInset={insets.bottom + 84}
+          quickReplies={t('quickReplies').split('|')}
         />
       </View>
     );
@@ -116,7 +124,7 @@ export function GarageInboxScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.head, { paddingTop: insets.top + 14 }]}>
-        <Text style={styles.title}>Boîte de réception</Text>
+        <Text style={styles.title}>{t('inboxTitle')}</Text>
       </View>
       <View style={styles.tabs}>
         <BouncyPressable
@@ -124,7 +132,7 @@ export function GarageInboxScreen() {
           style={[styles.tab, tab === 'quotes' && styles.tabActive]}
         >
           <Text style={[styles.tabText, tab === 'quotes' && styles.tabTextActive]}>
-            Devis ({quotes.length})
+            {t('quotes')} ({quotes.length})
           </Text>
         </BouncyPressable>
         <BouncyPressable
@@ -134,7 +142,7 @@ export function GarageInboxScreen() {
           <Text
             style={[styles.tabText, tab === 'bookings' && styles.tabTextActive]}
           >
-            RDV ({appts.length})
+            {t('bookings')} ({appts.length})
           </Text>
         </BouncyPressable>
       </View>
@@ -147,7 +155,7 @@ export function GarageInboxScreen() {
           keyExtractor={(q) => q.id}
           contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
           ListEmptyComponent={
-            <Text style={styles.hint}>Aucune demande de devis</Text>
+            <Text style={styles.hint}>{t('noQuoteRequests')}</Text>
           }
           renderItem={({ item }) => (
             <BouncyPressable
@@ -161,7 +169,7 @@ export function GarageInboxScreen() {
                 {item.description}
               </Text>
               <Text style={styles.meta}>
-                {item.status} · {item.messageCount} msg
+                {statusLabel(item.status)} · {item.messageCount} msg
               </Text>
             </BouncyPressable>
           )}
@@ -171,7 +179,9 @@ export function GarageInboxScreen() {
           data={appts}
           keyExtractor={(a) => a.id}
           contentContainerStyle={{ padding: 16, paddingBottom: 28 }}
-          ListEmptyComponent={<Text style={styles.hint}>Aucun rendez-vous</Text>}
+          ListEmptyComponent={
+            <Text style={styles.hint}>{t('noAppointments')}</Text>
+          }
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>
@@ -180,20 +190,20 @@ export function GarageInboxScreen() {
               <Text style={styles.cardDesc}>{item.slot}</Text>
               {!!item.note && <Text style={styles.meta}>{item.note}</Text>}
               <Text style={styles.meta}>{item.clientPhone}</Text>
-              <Text style={styles.status}>{item.status}</Text>
+              <Text style={styles.status}>{statusLabel(item.status)}</Text>
               {item.status === 'pending' && (
                 <View style={styles.rowActions}>
                   <BouncyPressable
                     onPress={() => decide(item.id, 'accepted')}
                     style={styles.accept}
                   >
-                    <Text style={styles.acceptText}>Accepter</Text>
+                    <Text style={styles.acceptText}>{t('accept')}</Text>
                   </BouncyPressable>
                   <BouncyPressable
                     onPress={() => decide(item.id, 'declined')}
                     style={styles.decline}
                   >
-                    <Text style={styles.declineText}>Refuser</Text>
+                    <Text style={styles.declineText}>{t('decline')}</Text>
                   </BouncyPressable>
                 </View>
               )}

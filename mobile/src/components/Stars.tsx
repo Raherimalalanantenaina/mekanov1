@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../i18n';
 import { font } from '../theme';
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
 /** Affichage note (rating) ou saisie (onRate + value). */
 export function Stars({ rating, count, size = 13, onRate, value }: Props) {
   const { colors } = useTheme();
+  const { t } = useI18n();
   if (onRate) {
     return (
       <View style={styles.row}>
@@ -36,7 +38,9 @@ export function Stars({ rating, count, size = 13, onRate, value }: Props) {
     return (
       <View style={styles.row}>
         <Ionicons name="star-outline" size={size} color={colors.faint} />
-        <Text style={[styles.text, { color: colors.faint }]}>Aucun avis</Text>
+        <Text style={[styles.text, { color: colors.faint }]}>
+          {t('noReviewsShort')}
+        </Text>
       </View>
     );
   }

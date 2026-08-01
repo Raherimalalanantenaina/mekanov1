@@ -15,6 +15,7 @@ import {
   Map as MapLibreMap,
   Marker,
   type CameraRef,
+  type MapRef,
 } from '@maplibre/maplibre-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -28,6 +29,7 @@ import { BouncyPressable } from '../components/Pressable';
 import { UserLocationMarker } from '../components/UserLocationMarker';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../i18n';
 import { OSM_STYLE, circlePolygon, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
@@ -57,10 +59,12 @@ export function MapScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { offline } = useAuth();
   const { colors } = useTheme();
+  const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
+  const mapRef = useRef<MapRef>(null);
   const [garages, setGarages] = useState<Garage[]>([]);
   const [selected, setSelected] = useState<Garage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,12 +164,42 @@ export function MapScreen() {
     });
   };
 
+  /**
+   * Sélection au toucher gérée au niveau de la carte : on prend le garage
+   * le plus proche du doigt (tolérance ~34 px convertie en km selon le
+   * zoom). Plus fiable que le onPress natif des marqueurs sur Android.
+   */
+  const onMapPress = async (lng: number, lat: number) => {
+    const zoom = (await mapRef.current?.getZoom()) ?? 12;
+    const kmPerPx =
+      (40075 * Math.cos((lat * Math.PI) / 180)) / (256 * 2 ** zoom);
+    const toleranceKm = 34 * kmPerPx;
+    let best: Garage | null = null;
+    let bestD = Infinity;
+    for (const g of visible) {
+      const d = haversineKm(
+        { latitude: lat, longitude: lng },
+        { latitude: g.latitude, longitude: g.longitude }
+      );
+      if (d < bestD) {
+        bestD = d;
+        best = g;
+      }
+    }
+    if (best && bestD <= toleranceKm) focusGarage(best);
+    else setSelected(null);
+  };
+
   return (
     <View style={styles.root}>
       <MapLibreMap
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         mapStyle={OSM_STYLE}
-        onPress={() => setSelected(null)}
+        onPress={(e) => {
+          const [lng, lat] = e.nativeEvent.lngLat;
+          onMapPress(lng, lat);
+        }}
       >
         <Camera
           ref={cameraRef}
@@ -247,15 +281,15 @@ export function MapScreen() {
           <Ionicons name="search" size={17} color={colors.muted} />
           <TextInput
             value={q}
-            onChangeText={(t) => {
-              setQ(t);
+            onChangeText={(text) => {
+              setQ(text);
               setSelected(null);
             }}
             onSubmitEditing={() => {
               const first = visible[0];
               if (first) focusGarage(first);
             }}
-            placeholder="Nom, ville, service…"
+            placeholder={t('searchPlaceholder')}
             placeholderTextColor={colors.faint}
             style={styles.searchInput}
             returnKeyType="search"
@@ -277,10 +311,10 @@ export function MapScreen() {
           <Ionicons name="map" size={15} color={colors.teal} />
           <Text style={styles.counterText}>
             {loading
-              ? 'Chargement…'
+              ? t('loading')
               : radiusKm != null
-                ? `${visible.length} garage${visible.length > 1 ? 's' : ''} à moins de ${radiusKm} km`
-                : `${visible.length} garage${visible.length > 1 ? 's' : ''}`}
+                ? t('garagesWithin', { n: visible.length, km: radiusKm })
+                : t('garagesCount', { n: visible.length })}
           </Text>
           {loading && <ActivityIndicator size="small" color={colors.teal} />}
         </View>
@@ -305,7 +339,7 @@ export function MapScreen() {
                 radiusKm == null && styles.radiusTextActive,
               ]}
             >
-              Tous
+              {t('allRadius')}
             </Text>
           </BouncyPressable>
           {RADIUS_OPTIONS.map((r) => {
@@ -384,8 +418,8 @@ export function MapScreen() {
           <Ionicons name="search-outline" size={17} color={colors.danger} />
           <Text style={styles.emptyRadiusText}>
             {q.trim()
-              ? `Aucun garage pour « ${q.trim()} »`
-              : `Aucun garage à moins de ${radiusKm} km — élargis le rayon`}
+              ? t('noGarageFor', { q: q.trim() })
+              : t('noGarageWithin', { km: radiusKm ?? 0 })}
           </Text>
         </View>
       )}

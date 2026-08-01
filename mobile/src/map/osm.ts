@@ -1,30 +1,10 @@
-import type { StyleSpecification } from '@maplibre/maplibre-react-native';
-
 /**
- * Style MapLibre basé sur les tuiles raster OpenStreetMap :
- * gratuit, sans clé d'API. Les tuiles consultées sont mises en cache
- * automatiquement par MapLibre et restent visibles hors ligne.
+ * Style de carte : OpenFreeMap « Liberty » — tuiles vectorielles gratuites,
+ * sans clé d'API ni inscription, rendu moderne (données OpenStreetMap).
+ * Les tuiles consultées sont mises en cache automatiquement par MapLibre
+ * et restent visibles hors ligne.
  */
-export const OSM_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [
-    {
-      id: 'background',
-      type: 'background',
-      paint: { 'background-color': '#EAEFEF' },
-    },
-    { id: 'osm', type: 'raster', source: 'osm' },
-  ],
-};
+export const OSM_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
 /** Équivalent zoom MapLibre d'un `latitudeDelta` de react-native-maps. */
 export function zoomForDelta(delta: number): number {

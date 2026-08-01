@@ -7,11 +7,18 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { I18nProvider } from './src/i18n';
 import { MekanoLogo } from './src/components/MekanoLogo';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { registerForPush } from './src/push';
 import { gradients } from './src/theme';
 
 function Boot() {
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
   const { mode } = useTheme();
+
+  // Enregistre le jeton push au démarrage, puis à chaque connexion garage
+  // (pour associer le compte au jeton côté serveur).
+  React.useEffect(() => {
+    if (!loading) registerForPush();
+  }, [loading, user?.id]);
   if (loading) {
     return (
       <LinearGradient colors={gradients.hero} style={styles.splash}>

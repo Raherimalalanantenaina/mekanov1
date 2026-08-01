@@ -1,5 +1,16 @@
 export type PriceItem = { service: string; price: string };
 
+/** Horaires d'une journée (lundi = index 0). */
+export type DayHours = { open: string; close: string; closed: boolean };
+
+/** Statistique journalière d'un garage. */
+export type DailyStat = {
+  day: string;
+  views: number;
+  calls: number;
+  searches: number;
+};
+
 export type Garage = {
   id: string;
   ownerId?: string;
@@ -18,6 +29,8 @@ export type Garage = {
   views: number;
   calls: number;
   openingHours: string;
+  /** Horaires structurés par jour (lundi = index 0), null si non renseignés */
+  hoursJson?: DayHours[] | null;
   isOpen: boolean;
   /** 'pending' = en attente de validation par l'administrateur */
   status?: 'pending' | 'approved';

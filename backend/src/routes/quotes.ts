@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db/pool';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
+import { pushToClient, pushToUser } from '../push';
 
 type QuoteRow = {
   id: string;
@@ -63,6 +64,23 @@ router.post('/', async (req, res) => {
      VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
     [garageId, clientId, clientName.trim(), clientPhone, description.trim(), photo]
   );
+
+  // Notifie le propriétaire du garage (sans bloquer la réponse)
+  query<{ owner_id: string; name: string }>(
+    `SELECT owner_id, name FROM garages WHERE id = $1`,
+    [garageId]
+  )
+    .then((g) =>
+      g.rows[0]
+        ? pushToUser(g.rows[0].owner_id, {
+            title: 'Nouvelle demande de devis',
+            body: `${clientName.trim()} : ${String(description).slice(0, 120)}`,
+            data: { type: 'quote', quoteId: rows[0].id },
+          })
+        : undefined
+    )
+    .catch(() => {});
+
   return res.status(201).json(mapQuote(rows[0]));
 });
 
@@ -135,7 +153,8 @@ router.post('/:id/messages', async (req, res) => {
   }
 
   const quote = await query<QuoteRow>(
-    `SELECT q.*, g.owner_id AS garage_owner FROM quote_requests q
+    `SELECT q.*, g.owner_id AS garage_owner, g.name AS garage_name
+     FROM quote_requests q
      JOIN garages g ON g.id = q.garage_id WHERE q.id = $1`,
     [req.params.id]
   );
@@ -165,6 +184,12 @@ router.post('/:id/messages', async (req, res) => {
          VALUES ($1,$2,$3,$4) RETURNING id, sender, body, photo, created_at`,
         [req.params.id, sender, body.trim(), photo]
       );
+      // Le garage a répondu → notifie le client
+      pushToClient(row.client_id, {
+        title: row.garage_name ?? 'Mekano',
+        body: body.trim() || '📷 Photo',
+        data: { type: 'quote', quoteId: req.params.id },
+      }).catch(() => {});
       return res.status(201).json(mapMessage(rows[0]));
     });
   } else {
@@ -176,6 +201,12 @@ router.post('/:id/messages', async (req, res) => {
      VALUES ($1,$2,$3,$4) RETURNING id, sender, body, photo, created_at`,
     [req.params.id, sender, body.trim(), photo]
   );
+  // Le client a écrit → notifie le propriétaire du garage
+  pushToUser(row.garage_owner, {
+    title: `${row.client_name} — devis`,
+    body: body.trim() || '📷 Photo',
+    data: { type: 'quote', quoteId: req.params.id },
+  }).catch(() => {});
   return res.status(201).json(mapMessage(rows[0]));
 });
 

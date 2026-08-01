@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -81,12 +80,12 @@ function Preferences({ styles, colors }: { styles: Styles; colors: ThemeColors }
         })}
       </View>
 
-      <Text style={styles.prefLabel}>Apparence</Text>
+      <Text style={styles.prefLabel}>{t('appearance')}</Text>
       <View style={styles.segment}>
         {(
           [
-            { key: 'light' as const, icon: 'sunny-outline' as const, label: 'Clair' },
-            { key: 'dark' as const, icon: 'moon-outline' as const, label: 'Sombre' },
+            { key: 'light' as const, icon: 'sunny-outline' as const, label: t('light') },
+            { key: 'dark' as const, icon: 'moon-outline' as const, label: t('dark') },
           ]
         ).map((m) => {
           const active = mode === m.key;
@@ -131,7 +130,7 @@ export function GarageAuthScreen() {
 
   const submit = async () => {
     if (offline) {
-      Alert.alert('Hors ligne', 'La connexion garage nécessite Internet.');
+      Alert.alert(t('offlineTitle'), t('loginNeedsNet'));
       return;
     }
     setBusy(true);
@@ -139,13 +138,10 @@ export function GarageAuthScreen() {
       if (mode === 'login') await login(email.trim(), password);
       else {
         await register(email.trim(), password, fullName.trim());
-        Alert.alert(
-          'Compte créé',
-          'Ton compte a été envoyé à l’administrateur Mekano pour validation. Tu pourras publier ton garage dès qu’il sera validé.'
-        );
+        Alert.alert(t('accountCreatedTitle'), t('accountCreatedText'));
       }
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     } finally {
       setBusy(false);
     }
@@ -163,7 +159,7 @@ export function GarageAuthScreen() {
         >
           <View style={styles.card}>
             <MekanoLogo size={64} showWordmark={false} />
-            <Text style={styles.cardTitle}>Espace garage</Text>
+            <Text style={styles.cardTitle}>{t('garageSpace')}</Text>
             <View style={styles.profileRow}>
               <Ionicons name="person-circle" size={40} color={colors.teal} />
               <View>
@@ -175,13 +171,13 @@ export function GarageAuthScreen() {
               <View style={[styles.rolePill, styles.rolePillPending]}>
                 <Ionicons name="hourglass-outline" size={13} color={colors.amberDark} />
                 <Text style={[styles.roleText, { color: colors.amberDark }]}>
-                  Compte en attente de validation
+                  {t('accountPendingPill')}
                 </Text>
               </View>
             ) : (
               <View style={styles.rolePill}>
                 <Ionicons name="shield-checkmark" size={13} color={colors.teal} />
-                <Text style={styles.roleText}>Compte garage validé</Text>
+                <Text style={styles.roleText}>{t('accountApprovedPill')}</Text>
               </View>
             )}
 
@@ -189,7 +185,7 @@ export function GarageAuthScreen() {
 
             <BouncyPressable onPress={() => logout()} style={styles.logoutBtn}>
               <Ionicons name="log-out-outline" size={17} color={colors.danger} />
-              <Text style={styles.logoutText}>Se déconnecter</Text>
+              <Text style={styles.logoutText}>{t('logout')}</Text>
             </BouncyPressable>
           </View>
         </ScrollView>
@@ -200,10 +196,7 @@ export function GarageAuthScreen() {
   /* ===== Login / inscription ===== */
   return (
     <View style={styles.root}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
@@ -215,16 +208,14 @@ export function GarageAuthScreen() {
 
           <View style={[styles.card, { marginTop: 28 }]}>
             <Text style={styles.cardTitle}>
-              {mode === 'login' ? 'Connexion garage' : 'Créer un compte'}
+              {mode === 'login' ? t('loginTitle') : t('registerTitle')}
             </Text>
-            <Text style={styles.cardSub}>
-              Réservé aux propriétaires de garage
-            </Text>
+            <Text style={styles.cardSub}>{t('ownersOnly')}</Text>
 
             {mode === 'register' && (
               <Field
                 icon="person-outline"
-                placeholder="Nom du responsable"
+                placeholder={t('managerName')}
                 value={fullName}
                 onChangeText={setFullName}
                 styles={styles}
@@ -233,7 +224,7 @@ export function GarageAuthScreen() {
             )}
             <Field
               icon="mail-outline"
-              placeholder="Email"
+              placeholder={t('email')}
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
@@ -243,7 +234,7 @@ export function GarageAuthScreen() {
             />
             <Field
               icon="lock-closed-outline"
-              placeholder="Mot de passe"
+              placeholder={t('password')}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
@@ -258,7 +249,7 @@ export function GarageAuthScreen() {
             >
               <View style={styles.submit}>
                 <Text style={styles.submitText}>
-                  {mode === 'login' ? 'Se connecter' : 'Créer le compte'}
+                  {mode === 'login' ? t('signIn') : t('createAccountBtn')}
                 </Text>
                 <Ionicons name="arrow-forward" size={17} color={colors.white} />
               </View>
@@ -268,9 +259,7 @@ export function GarageAuthScreen() {
               style={styles.switch}
               onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
             >
-              {mode === 'login'
-                ? 'Pas encore de compte ? S’inscrire'
-                : 'Déjà un compte ? Se connecter'}
+              {mode === 'login' ? t('switchToRegister') : t('switchToLogin')}
             </Text>
 
             <Preferences styles={styles} colors={colors} />

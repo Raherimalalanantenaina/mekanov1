@@ -3,6 +3,7 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -18,16 +20,20 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   createGarage,
   deleteGarage,
+  fetchGarageDailyStats,
   fetchMyGarages,
   updateGarage,
 } from '../api/client';
 import { GarageCard } from '../components/GarageCard';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { BouncyPressable } from '../components/Pressable';
+import { StatsChart } from '../components/StatsChart';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { defaultWeek, summarizeWeek } from '../hours';
+import { useI18n } from '../i18n';
 import { font, radii, shadow, type ThemeColors } from '../theme';
-import type { Garage } from '../types';
+import type { DailyStat, DayHours, Garage } from '../types';
 
 const MAX_PHOTOS = 12;
 
@@ -73,6 +79,7 @@ function Input({
 export function MyGarageScreen() {
   const { user, offline, refreshUser } = useAuth();
   const { colors } = useTheme();
+  const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -89,10 +96,15 @@ export function MyGarageScreen() {
   const [promo, setPromo] = useState('');
   const [priceText, setPriceText] = useState('');
   const [description, setDescription] = useState('');
-  const [openingHours, setOpeningHours] = useState('Lun–Sam 8h–18h');
+  const [week, setWeek] = useState<DayHours[]>(defaultWeek());
+  const [timePicker, setTimePicker] = useState<{
+    day: number;
+    field: 'open' | 'close';
+  } | null>(null);
   const [mobileService, setMobileService] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [stats, setStats] = useState<DailyStat[]>([]);
 
   const resetForm = () => {
     setEditing(null);
@@ -105,7 +117,7 @@ export function MyGarageScreen() {
     setPromo('');
     setPriceText('');
     setDescription('');
-    setOpeningHours('Lun–Sam 8h–18h');
+    setWeek(defaultWeek());
     setMobileService(false);
     setIsOpen(true);
   };
@@ -123,7 +135,7 @@ export function MyGarageScreen() {
       (g.priceList ?? []).map((p) => `${p.service}:${p.price}`).join(', ')
     );
     setDescription(g.description ?? '');
-    setOpeningHours(g.openingHours ?? 'Lun–Sam 8h–18h');
+    setWeek(g.hoursJson?.length === 7 ? g.hoursJson : defaultWeek());
     setMobileService(!!g.mobileService);
     setIsOpen(g.isOpen);
   };
@@ -134,15 +146,34 @@ export function MyGarageScreen() {
     );
   };
 
+  const setDay = (i: number, patch: Partial<DayHours>) =>
+    setWeek((prev) => prev.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+
+  const hhmmToDate = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h || 0, m || 0, 0, 0);
+    return d;
+  };
+
   const reload = useCallback(async () => {
     if (!user || offline) return;
     try {
       await refreshUser();
-      setMine(await fetchMyGarages());
+      const list = await fetchMyGarages();
+      setMine(list);
+      // Statistiques journalières de la fiche (une seule par compte)
+      if (list[0]) {
+        fetchGarageDailyStats(list[0].id)
+          .then(setStats)
+          .catch(() => setStats([]));
+      } else {
+        setStats([]);
+      }
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     }
-  }, [user, offline, refreshUser]);
+  }, [user, offline, refreshUser, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -157,11 +188,8 @@ export function MyGarageScreen() {
           <View style={styles.emptyIcon}>
             <Ionicons name="key-outline" size={30} color={colors.teal} />
           </View>
-          <Text style={styles.emptyTitle}>Espace réservé</Text>
-          <Text style={styles.hint}>
-            Connecte-toi dans l’onglet Garage pour publier et gérer tes
-            fiches.
-          </Text>
+          <Text style={styles.emptyTitle}>{t('reservedTitle')}</Text>
+          <Text style={styles.hint}>{t('reservedText')}</Text>
         </View>
       </View>
     );
@@ -169,7 +197,7 @@ export function MyGarageScreen() {
 
   const pickPhoto = async () => {
     if (photos.length >= MAX_PHOTOS) {
-      Alert.alert('Limite', `Maximum ${MAX_PHOTOS} photos.`);
+      Alert.alert(t('limit'), t('maxPhotos', { n: MAX_PHOTOS }));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -200,11 +228,11 @@ export function MyGarageScreen() {
 
   const onSubmit = async () => {
     if (offline) {
-      Alert.alert('Hors ligne', 'Cette action nécessite une connexion.');
+      Alert.alert(t('offlineTitle'), t('needsConnection'));
       return;
     }
     if (!name.trim() || !address.trim()) {
-      Alert.alert('Champs requis', 'Nom et adresse sont obligatoires.');
+      Alert.alert(t('requiredFields'), t('nameAddressRequired'));
       return;
     }
     setBusy(true);
@@ -219,13 +247,15 @@ export function MyGarageScreen() {
         promo: promo.trim(),
         priceList: parsePrices(),
         description: description.trim() || 'Garage inscrit via Mekano',
-        openingHours: openingHours.trim() || 'Lun–Sam 8h–18h',
+        openingHours:
+          summarizeWeek(week, t('daysShort').split(',')) || t('closedDay'),
+        hoursJson: week,
         mobileService,
         isOpen,
       };
       if (editing) {
         await updateGarage(editing.id, payload);
-        Alert.alert('Enregistré', 'Fiche mise à jour.');
+        Alert.alert(t('saved'), t('sheetUpdated'));
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
         let latitude = -18.8792;
@@ -240,15 +270,12 @@ export function MyGarageScreen() {
           latitude,
           longitude,
         });
-        Alert.alert(
-          'Envoyé pour validation',
-          'Ton garage a été soumis à l’administrateur Mekano. Il sera visible par les clients dès sa validation.'
-        );
+        Alert.alert(t('submittedTitle'), t('submittedText'));
       }
       resetForm();
       await reload();
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     } finally {
       setBusy(false);
     }
@@ -259,16 +286,16 @@ export function MyGarageScreen() {
       await updateGarage(g.id, { isOpen: !g.isOpen });
       await reload();
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
   const onDelete = () => {
     if (!editing) return;
-    Alert.alert('Supprimer', `Supprimer « ${editing.name} » ?`, [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t('delete'), t('deleteConfirm', { name: editing.name }), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Supprimer',
+        text: t('delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -276,7 +303,7 @@ export function MyGarageScreen() {
             resetForm();
             await reload();
           } catch (e) {
-            Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec');
+            Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
           }
         },
       },
@@ -295,14 +322,13 @@ export function MyGarageScreen() {
           { paddingTop: insets.top + 16, paddingHorizontal: pad },
         ]}
       >
-        <Text style={styles.heroTitle}>Mon garage</Text>
-        <Text style={styles.heroSub}>
-          Un compte = un garage · publie et gère ta fiche
-        </Text>
+        <Text style={styles.heroTitle}>{t('myGarageTitle')}</Text>
+        <Text style={styles.heroSub}>{t('myGarageSub')}</Text>
       </View>
 
       <OfflineBanner offline={offline} />
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <FlatList
         data={mine}
         keyExtractor={(g) => g.id}
@@ -315,13 +341,9 @@ export function MyGarageScreen() {
                   <Ionicons name="hourglass-outline" size={22} color={colors.amberDark} />
                 </View>
                 <Text style={styles.noticeTitle}>
-                  Compte en attente de validation
+                  {t('accountPendingTitle')}
                 </Text>
-                <Text style={styles.noticeText}>
-                  Ton compte doit d’abord être validé par l’administrateur
-                  Mekano. Dès qu’il aura confirmé, tu pourras publier ton
-                  garage — reviens sur cet écran pour vérifier.
-                </Text>
+                <Text style={styles.noticeText}>{t('accountPendingText')}</Text>
               </View>
             )}
 
@@ -330,11 +352,8 @@ export function MyGarageScreen() {
                 <View style={styles.noticeIcon}>
                   <Ionicons name="business-outline" size={22} color={colors.teal} />
                 </View>
-                <Text style={styles.noticeTitle}>Ta fiche garage</Text>
-                <Text style={styles.noticeText}>
-                  Un seul garage par compte. Touche ta fiche ci-dessous pour
-                  modifier son nom, ses services, ses photos ou ses tarifs.
-                </Text>
+                <Text style={styles.noticeTitle}>{t('yourSheetTitle')}</Text>
+                <Text style={styles.noticeText}>{t('yourSheetText')}</Text>
               </View>
             )}
 
@@ -342,57 +361,115 @@ export function MyGarageScreen() {
           <View style={[styles.form, shadow.card]}>
             <View style={styles.formHead}>
               <Text style={styles.formTitle}>
-                {editing ? `Modifier · ${editing.name}` : 'Publier mon garage'}
+                {editing
+                  ? `${t('editPrefix')} · ${editing.name}`
+                  : t('publishMyGarage')}
               </Text>
               {editing && (
                 <Text style={styles.cancelLink} onPress={resetForm}>
-                  Annuler
+                  {t('cancel')}
                 </Text>
               )}
             </View>
 
             <Input
               icon="business-outline"
-              placeholder="Nom du garage"
+              placeholder={t('garageName')}
               value={name}
               onChangeText={setName}
             />
             <Input
               icon="location-outline"
-              placeholder="Adresse"
+              placeholder={t('address')}
               value={address}
               onChangeText={setAddress}
             />
             <Input
               icon="map-outline"
-              placeholder="Ville"
+              placeholder={t('city')}
               value={city}
               onChangeText={setCity}
             />
             <Input
               icon="call-outline"
-              placeholder="Téléphone"
+              placeholder={t('phone')}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
             />
             <Input
               icon="document-text-outline"
-              placeholder="Description du garage"
+              placeholder={t('description')}
               value={description}
               onChangeText={setDescription}
             />
-            <Input
-              icon="time-outline"
-              placeholder="Horaires (ex : Lun–Sam 8h–18h)"
-              value={openingHours}
-              onChangeText={setOpeningHours}
-            />
+            {/* Horaires par jour */}
+            <Text style={styles.sectionLabel}>{t('hoursPerDay')}</Text>
+            <View style={styles.hoursBox}>
+              {week.map((d, i) => {
+                const dayName = t('daysShort').split(',')[i];
+                return (
+                  <View
+                    key={i}
+                    style={[styles.hoursRow, i > 0 && styles.hoursRowBorder]}
+                  >
+                    <BouncyPressable
+                      onPress={() => setDay(i, { closed: !d.closed })}
+                      style={[styles.dayToggle, !d.closed && styles.dayToggleOn]}
+                    >
+                      <Ionicons
+                        name={d.closed ? 'close' : 'checkmark'}
+                        size={13}
+                        color={d.closed ? colors.faint : colors.white}
+                      />
+                    </BouncyPressable>
+                    <Text style={styles.hoursDay}>{dayName}</Text>
+                    {d.closed ? (
+                      <Text style={styles.hoursClosed}>{t('closedDay')}</Text>
+                    ) : (
+                      <View style={styles.hoursBtns}>
+                        <BouncyPressable
+                          onPress={() => setTimePicker({ day: i, field: 'open' })}
+                          style={styles.hoursBtn}
+                        >
+                          <Text style={styles.hoursBtnText}>{d.open}</Text>
+                        </BouncyPressable>
+                        <Text style={styles.hoursDash}>–</Text>
+                        <BouncyPressable
+                          onPress={() =>
+                            setTimePicker({ day: i, field: 'close' })
+                          }
+                          style={styles.hoursBtn}
+                        >
+                          <Text style={styles.hoursBtnText}>{d.close}</Text>
+                        </BouncyPressable>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+            {timePicker && (
+              <DateTimePicker
+                value={hhmmToDate(week[timePicker.day][timePicker.field])}
+                mode="time"
+                is24Hour
+                onChange={(_event, date) => {
+                  const target = timePicker;
+                  setTimePicker(null);
+                  if (date && target) {
+                    const hhmm = `${String(date.getHours()).padStart(2, '0')}:${String(
+                      date.getMinutes()
+                    ).padStart(2, '0')}`;
+                    setDay(target.day, { [target.field]: hhmm });
+                  }
+                }}
+              />
+            )}
 
             {/* Services : multi-sélection */}
             <Text style={styles.sectionLabel}>
-              Services proposés ({services.length} sélectionné
-              {services.length > 1 ? 's' : ''})
+              {t('servicesSelected', { n: services.length })}
             </Text>
             <View style={styles.chipsWrap}>
               {[...new Set([...SERVICE_OPTIONS, ...services])].map((s) => {
@@ -421,13 +498,13 @@ export function MyGarageScreen() {
 
             <Input
               icon="pricetag-outline"
-              placeholder="Promo (ex : -20% vidange cette semaine)"
+              placeholder={t('promoPlaceholder')}
               value={promo}
               onChangeText={setPromo}
             />
             <Input
               icon="cash-outline"
-              placeholder="Prix (ex : vidange:50 000 Ar, freins:80 000 Ar)"
+              placeholder={t('pricesPlaceholder')}
               value={priceText}
               onChangeText={setPriceText}
             />
@@ -443,7 +520,7 @@ export function MyGarageScreen() {
                   color={isOpen ? colors.success : colors.danger}
                 />
                 <Text style={styles.toggleText}>
-                  {isOpen ? 'Ouvert' : 'Fermé'}
+                  {isOpen ? t('open') : t('closed')}
                 </Text>
               </BouncyPressable>
               <BouncyPressable
@@ -455,7 +532,7 @@ export function MyGarageScreen() {
                   size={16}
                   color={mobileService ? colors.teal : colors.faint}
                 />
-                <Text style={styles.toggleText}>Se déplace</Text>
+                <Text style={styles.toggleText}>{t('movesAround')}</Text>
               </BouncyPressable>
             </View>
 
@@ -482,7 +559,7 @@ export function MyGarageScreen() {
               {photos.length < MAX_PHOTOS && (
                 <BouncyPressable onPress={pickPhoto} style={styles.photoAdd}>
                   <Ionicons name="camera-outline" size={20} color={colors.teal} />
-                  <Text style={styles.photoAddText}>Photo</Text>
+                  <Text style={styles.photoAddText}>{t('photo')}</Text>
                 </BouncyPressable>
               )}
             </ScrollView>
@@ -500,10 +577,10 @@ export function MyGarageScreen() {
                 />
                 <Text style={styles.btnText}>
                   {busy
-                    ? 'Envoi…'
+                    ? t('sending')
                     : editing
-                      ? 'Enregistrer les modifications'
-                      : 'Publier mon garage'}
+                      ? t('saveChanges')
+                      : t('publishMyGarage')}
                 </Text>
               </View>
             </BouncyPressable>
@@ -511,7 +588,7 @@ export function MyGarageScreen() {
             {editing && (
               <BouncyPressable onPress={onDelete} style={styles.deleteBtn}>
                 <Ionicons name="trash-outline" size={16} color={colors.danger} />
-                <Text style={styles.deleteText}>Supprimer ce garage</Text>
+                <Text style={styles.deleteText}>{t('deleteThisGarage')}</Text>
               </BouncyPressable>
             )}
           </View>
@@ -519,9 +596,7 @@ export function MyGarageScreen() {
 
             {!accountPending && (
               <Text style={styles.listLabel}>
-                {hasGarage
-                  ? 'Ma fiche — touche-la pour la modifier'
-                  : 'Aucune fiche publiée pour l’instant'}
+                {hasGarage ? t('mySheetTouch') : t('noSheetYet')}
               </Text>
             )}
           </View>
@@ -532,7 +607,7 @@ export function MyGarageScreen() {
               <View style={styles.pendingBadge}>
                 <Ionicons name="hourglass-outline" size={13} color={colors.amberDark} />
                 <Text style={styles.pendingBadgeText}>
-                  En attente de validation — pas encore visible par les clients
+                  {t('pendingNotVisible')}
                 </Text>
               </View>
             )}
@@ -556,13 +631,15 @@ export function MyGarageScreen() {
                     fontSize: 12,
                   }}
                 >
-                  {item.isOpen ? 'Passer fermé' : 'Passer ouvert'}
+                  {item.isOpen ? t('setClosed') : t('setOpen')}
                 </Text>
               </BouncyPressable>
             </View>
+            <StatsChart data={stats} />
           </View>
         )}
       />
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -669,6 +746,70 @@ const createStyles = (colors: ThemeColors) =>
     marginTop: 4,
     marginBottom: 8,
   },
+  hoursBox: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    marginBottom: 12,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  hoursRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  dayToggle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.field,
+  },
+  dayToggleOn: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
+  },
+  hoursDay: {
+    width: 44,
+    fontSize: 12.5,
+    fontWeight: font.bold,
+    color: colors.ink,
+  },
+  hoursClosed: {
+    flex: 1,
+    fontSize: 12.5,
+    color: colors.faint,
+    textAlign: 'right',
+  },
+  hoursBtns: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+  },
+  hoursBtn: {
+    backgroundColor: colors.field,
+    borderRadius: radii.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  hoursBtnText: {
+    fontSize: 12.5,
+    fontWeight: font.bold,
+    color: colors.teal,
+  },
+  hoursDash: { color: colors.faint },
   chipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',

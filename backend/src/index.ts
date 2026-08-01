@@ -6,6 +6,7 @@ import garageRoutes from './routes/garages';
 import quoteRoutes from './routes/quotes';
 import appointmentRoutes from './routes/appointments';
 import adminRoutes from './routes/admin';
+import pushRoutes from './routes/push';
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/garages', garageRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/push', pushRoutes);
 
 app.use(
   (

@@ -93,6 +93,29 @@ CREATE INDEX IF NOT EXISTS idx_appt_client ON appointments (client_id);
 CREATE INDEX IF NOT EXISTS idx_garages_city ON garages (city);
 CREATE INDEX IF NOT EXISTS idx_garages_location ON garages (latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_garages_owner ON garages (owner_id);
+
+-- Horaires structurés par jour (null = seul le texte libre opening_hours existe)
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS hours_json JSONB;
+
+-- Jetons de notification push Expo (clients anonymes et comptes garage)
+CREATE TABLE IF NOT EXISTS push_tokens (
+  token TEXT PRIMARY KEY,
+  client_id TEXT,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_push_client ON push_tokens (client_id);
+CREATE INDEX IF NOT EXISTS idx_push_user ON push_tokens (user_id);
+
+-- Statistiques journalières par garage (vues, appels, apparitions en recherche)
+CREATE TABLE IF NOT EXISTS garage_stats_daily (
+  garage_id UUID NOT NULL REFERENCES garages(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  views INT NOT NULL DEFAULT 0,
+  calls INT NOT NULL DEFAULT 0,
+  searches INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (garage_id, day)
+);
 `;
 
 async function migrate() {

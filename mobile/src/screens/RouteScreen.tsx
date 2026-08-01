@@ -16,6 +16,7 @@ import { fetchRoute, LatLng, RouteResult } from '../api/client';
 import { BouncyPressable } from '../components/Pressable';
 import { UserLocationMarker } from '../components/UserLocationMarker';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../i18n';
 import { OSM_STYLE, boundsOf, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/types';
@@ -23,8 +24,9 @@ import type { RootStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'Route'>;
 
 export function RouteScreen({ route, navigation }: Props) {
-  const { name, latitude, longitude } = route.params;
+  const { garageId, name, latitude, longitude } = route.params;
   const { colors } = useTheme();
+  const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
@@ -38,7 +40,7 @@ export function RouteScreen({ route, navigation }: Props) {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setError('Autorise la localisation pour tracer l’itinéraire.');
+        setError(t('locationNeeded'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({});
@@ -47,7 +49,7 @@ export function RouteScreen({ route, navigation }: Props) {
         longitude: pos.coords.longitude,
       };
       setUserPos(from);
-      const r = await fetchRoute(from, destination);
+      const r = await fetchRoute(from, destination, garageId);
       setResult(r);
       setTimeout(() => {
         cameraRef.current?.fitBounds(
@@ -58,9 +60,7 @@ export function RouteScreen({ route, navigation }: Props) {
           }
         );
       }, 400);
-    })().catch(() =>
-      setError('Impossible de calculer l’itinéraire pour le moment.')
-    );
+    })().catch(() => setError(t('routeError')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latitude, longitude]);
 
@@ -148,20 +148,23 @@ export function RouteScreen({ route, navigation }: Props) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.panelTitle} numberOfLines={1}>
-            Vers {name}
+            {t('towards', { name })}
           </Text>
           {error ? (
             <Text style={styles.panelError}>{error}</Text>
           ) : result ? (
             <Text style={styles.panelInfo}>
-              {result.distanceKm.toFixed(1)} km ·{' '}
-              {Math.round(result.durationMin)} min en voiture
-              {result.straightLine ? ' (estimation à vol d’oiseau)' : ''}
+              {t('routeSummary', {
+                km: result.distanceKm.toFixed(1),
+                min: Math.round(result.durationMin),
+              })}
+              {result.fromCache ? ` ${t('cachedRouteNote')}` : ''}
+              {result.straightLine ? ` ${t('straightLineNote')}` : ''}
             </Text>
           ) : (
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color={colors.teal} />
-              <Text style={styles.panelInfo}>Calcul de l’itinéraire…</Text>
+              <Text style={styles.panelInfo}>{t('calculatingRoute')}</Text>
             </View>
           )}
         </View>

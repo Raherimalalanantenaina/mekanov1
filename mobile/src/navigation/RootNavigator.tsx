@@ -3,6 +3,7 @@ import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreen } from '../screens/HomeScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { GarageDetailScreen } from '../screens/GarageDetailScreen';
@@ -24,6 +25,7 @@ function MainTabs() {
   const { user } = useAuth();
   const { t } = useI18n();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -36,15 +38,17 @@ function MainTabs() {
           fontWeight: font.bold,
           marginTop: 2,
         },
-        // Barre plate classique : filet fin en haut, aucun relief
+        // Barre plate classique : filet fin en haut, aucun relief.
+        // On ajoute la zone de sécurité du bas (touches système du téléphone)
+        // pour que la barre reste au-dessus de la navigation Android.
         tabBarStyle: {
           backgroundColor: colors.bg,
           borderTopWidth: 1,
           borderTopColor: colors.line,
           elevation: 0,
-          height: 62,
+          height: 62 + insets.bottom,
           paddingTop: 6,
-          paddingBottom: 8,
+          paddingBottom: 8 + insets.bottom,
         },
         tabBarIcon: ({ focused, color, size }) => {
           const map: Record<string, keyof typeof Ionicons.glyphMap> = {

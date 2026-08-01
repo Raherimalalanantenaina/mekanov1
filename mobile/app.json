@@ -21,8 +21,8 @@
     "android": {
       "package": "app.mekano.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#0D7377",
-        "foregroundImage": "./assets/mekano-logo.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -50,7 +50,13 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "color": "#12717A"
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/mekano-logo.png"

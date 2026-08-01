@@ -25,6 +25,7 @@ import { OfflineBanner } from '../components/OfflineBanner';
 import { BouncyPressable } from '../components/Pressable';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
@@ -108,7 +109,7 @@ export function HomeScreen() {
 
   const displayed = useMemo(() => {
     let list = [...garages];
-    if (onlyOpen) list = list.filter((g) => g.isOpen);
+    if (onlyOpen) list = list.filter((g) => isOpenNow(g));
     if (onlyFav) list = list.filter((g) => favorites.includes(g.id));
     list.sort((a, b) => {
       if (sort === 'rating') {
@@ -120,7 +121,7 @@ export function HomeScreen() {
   }, [garages, onlyOpen, onlyFav, favorites, sort]);
 
   const onSos = () => {
-    const open = displayed.filter((g) => g.isOpen);
+    const open = displayed.filter((g) => isOpenNow(g));
     const target = open[0] ?? displayed[0];
     if (!target) {
       Alert.alert('SOS', t('sosNone'));
@@ -367,7 +368,7 @@ export function HomeScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Ionicons name="car-outline" size={44} color={colors.faint} />
-              <Text style={styles.empty}>Aucun garage trouvé</Text>
+              <Text style={styles.empty}>{t('noGarageFound')}</Text>
             </View>
           }
           renderItem={({ item }) => (

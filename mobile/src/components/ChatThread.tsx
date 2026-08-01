@@ -2,6 +2,9 @@ import React, { useRef, useState } from 'react';
 import {
   FlatList,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -10,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { QuoteMessage } from '../types';
 import { BouncyPressable } from './Pressable';
@@ -55,6 +59,8 @@ type Props = {
   placeholder: string;
   onSend: (body: string, photo: string) => Promise<void>;
   bottomInset: number;
+  /** Suggestions tapables au-dessus du champ de saisie. */
+  quickReplies?: string[];
 };
 
 export function ChatThread({
@@ -63,13 +69,34 @@ export function ChatThread({
   placeholder,
   onSend,
   bottomInset,
+  quickReplies,
 }: Props) {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState('');
   const [sending, setSending] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const listRef = useRef<FlatList<QuoteMessage>>(null);
+
+  React.useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setKeyboardOpen(true);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+      }
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardOpen(false)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const pickPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -97,7 +124,7 @@ export function ChatThread({
   };
 
   return (
-    <>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <FlatList
         ref={listRef}
         data={messages}
@@ -140,11 +167,37 @@ export function ChatThread({
           <BouncyPressable onPress={() => setPhoto('')} style={styles.previewRemove}>
             <Ionicons name="close" size={13} color={colors.white} />
           </BouncyPressable>
-          <Text style={styles.previewText}>Photo prête à envoyer</Text>
+          <Text style={styles.previewText}>{t('photoReady')}</Text>
         </View>
       )}
 
-      <View style={[styles.composer, { paddingBottom: 12 + bottomInset }]}>
+      {quickReplies && quickReplies.length > 0 && (
+        <FlatList
+          horizontal
+          data={quickReplies}
+          keyExtractor={(r) => r}
+          showsHorizontalScrollIndicator={false}
+          style={styles.quickRow}
+          contentContainerStyle={{ gap: 7, paddingHorizontal: 12 }}
+          renderItem={({ item }) => (
+            <BouncyPressable
+              onPress={() => setDraft(item)}
+              style={styles.quickChip}
+            >
+              <Text style={styles.quickChipText} numberOfLines={1}>
+                {item}
+              </Text>
+            </BouncyPressable>
+          )}
+        />
+      )}
+
+      <View
+        style={[
+          styles.composer,
+          { paddingBottom: keyboardOpen ? 12 : 12 + bottomInset },
+        ]}
+      >
         <BouncyPressable onPress={pickPhoto} style={styles.photoBtn}>
           <Ionicons name="image-outline" size={19} color={colors.teal} />
         </BouncyPressable>
@@ -163,7 +216,7 @@ export function ChatThread({
           <Ionicons name="send" size={16} color={colors.white} />
         </BouncyPressable>
       </View>
-    </>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -234,6 +287,25 @@ const createStyles = (colors: ThemeColors) =>
     justifyContent: 'center',
   },
   previewText: { color: colors.muted, fontSize: 12.5, fontWeight: font.semibold },
+  quickRow: {
+    flexGrow: 0,
+    paddingVertical: 8,
+    backgroundColor: colors.bg,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  quickChip: {
+    backgroundColor: colors.tealSoft,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    maxWidth: 260,
+  },
+  quickChipText: {
+    color: colors.teal,
+    fontSize: 12.5,
+    fontWeight: font.semibold,
+  },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

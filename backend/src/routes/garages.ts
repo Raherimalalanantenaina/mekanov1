@@ -5,6 +5,9 @@ import { config } from '../config';
 import { sendAdminValidationEmail } from '../mailer';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
 
+/** Horaires d'une journée : { open: 'HH:MM', close: 'HH:MM', closed: bool } */
+export type DayHours = { open: string; close: string; closed: boolean };
+
 export type GarageRow = {
   id: string;
   owner_id: string;
@@ -23,6 +26,7 @@ export type GarageRow = {
   views: number;
   calls: number;
   opening_hours: string;
+  hours_json: DayHours[] | null;
   is_open: boolean;
   status: 'pending' | 'approved';
   updated_at: string;
@@ -51,6 +55,7 @@ function mapGarage(row: GarageRow) {
     views: row.views ?? 0,
     calls: row.calls ?? 0,
     openingHours: row.opening_hours,
+    hoursJson: row.hours_json ?? null,
     isOpen: row.is_open,
     status: row.status ?? 'approved',
     updatedAt: row.updated_at,
@@ -124,6 +129,19 @@ router.get('/', async (req, res) => {
   `;
 
   const { rows } = await query<GarageRow>(sql, params);
+
+  // Statistique « apparitions en recherche » (uniquement les vraies recherches)
+  if (q && rows.length > 0) {
+    const ids = rows.slice(0, 20).map((r) => r.id);
+    query(
+      `INSERT INTO garage_stats_daily (garage_id, day, searches)
+       SELECT unnest($1::uuid[]), CURRENT_DATE, 1
+       ON CONFLICT (garage_id, day)
+       DO UPDATE SET searches = garage_stats_daily.searches + 1`,
+      [ids]
+    ).catch(() => {});
+  }
+
   res.setHeader('X-Sync-Time', new Date().toISOString());
   return res.json({
     syncedAt: new Date().toISOString(),
@@ -156,8 +174,61 @@ router.post('/:id/track/:kind', async (req, res) => {
   await query(`UPDATE garages SET ${kind} = ${kind} + 1 WHERE id = $1`, [
     req.params.id,
   ]);
+  // Agrégat journalier pour le graphique
+  query(
+    `INSERT INTO garage_stats_daily (garage_id, day, ${kind})
+     VALUES ($1, CURRENT_DATE, 1)
+     ON CONFLICT (garage_id, day)
+     DO UPDATE SET ${kind} = garage_stats_daily.${kind} + 1`,
+    [req.params.id]
+  ).catch(() => {});
   return res.status(204).end();
 });
+
+/** Statistiques journalières (propriétaire uniquement) */
+router.get(
+  '/:id/stats/daily',
+  requireGarageAuth,
+  async (req: AuthedRequest, res) => {
+    const owner = await query<{ owner_id: string }>(
+      `SELECT owner_id FROM garages WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!owner.rows[0]) {
+      return res.status(404).json({ error: 'Garage introuvable' });
+    }
+    if (owner.rows[0].owner_id !== req.user!.id) {
+      return res.status(403).json({ error: 'Non autorisé' });
+    }
+    const days = Math.min(Number(req.query.days) || 7, 30);
+    const { rows } = await query<{
+      day: string;
+      views: number;
+      calls: number;
+      searches: number;
+    }>(
+      `SELECT gs.day::date::text AS day,
+              COALESCE(d.views, 0) AS views,
+              COALESCE(d.calls, 0) AS calls,
+              COALESCE(d.searches, 0) AS searches
+       FROM generate_series(
+         CURRENT_DATE - ($2::int - 1), CURRENT_DATE, interval '1 day'
+       ) AS gs(day)
+       LEFT JOIN garage_stats_daily d
+         ON d.garage_id = $1 AND d.day = gs.day::date
+       ORDER BY gs.day ASC`,
+      [req.params.id, days]
+    );
+    return res.json(
+      rows.map((r) => ({
+        day: r.day,
+        views: Number(r.views ?? 0),
+        calls: Number(r.calls ?? 0),
+        searches: Number(r.searches ?? 0),
+      }))
+    );
+  }
+);
 
 /** Avis */
 router.get('/:id/reviews', async (req, res) => {
@@ -218,6 +289,7 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
     promo = '',
     priceList = [],
     openingHours = 'Lun–Sam 8h–18h',
+    hoursJson = null,
     isOpen = true,
   } = req.body;
 
@@ -256,9 +328,9 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
   const { rows } = await query<GarageRow>(
     `INSERT INTO garages
       (owner_id, name, description, address, city, phone, latitude, longitude,
-       services, photos, mobile_service, promo, price_list, opening_hours, is_open,
-       status, approval_token)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending',$16)
+       services, photos, mobile_service, promo, price_list, opening_hours,
+       hours_json, is_open, status, approval_token)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17)
      RETURNING *`,
     [
       req.user!.id,
@@ -275,6 +347,7 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
       promo,
       JSON.stringify(priceList),
       openingHours,
+      hoursJson ? JSON.stringify(hoursJson) : null,
       isOpen,
       approvalToken,
     ]
@@ -317,8 +390,8 @@ router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
       name = $1, description = $2, address = $3, city = $4, phone = $5,
       latitude = $6, longitude = $7, services = $8, photos = $9,
       mobile_service = $10, promo = $11, price_list = $12,
-      opening_hours = $13, is_open = $14, updated_at = NOW()
-     WHERE id = $15
+      opening_hours = $13, hours_json = $14, is_open = $15, updated_at = NOW()
+     WHERE id = $16
      RETURNING *`,
     [
       b.name ?? g.name,
@@ -334,6 +407,13 @@ router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
       b.promo ?? g.promo,
       JSON.stringify(b.priceList ?? g.price_list),
       b.openingHours ?? g.opening_hours,
+      b.hoursJson !== undefined
+        ? b.hoursJson
+          ? JSON.stringify(b.hoursJson)
+          : null
+        : g.hours_json
+          ? JSON.stringify(g.hours_json)
+          : null,
       b.isOpen ?? g.is_open,
       req.params.id,
     ]

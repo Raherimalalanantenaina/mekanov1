@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db/pool';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
+import { pushToClient, pushToUser } from '../push';
 
 type ApptRow = {
   id: string;
@@ -53,6 +54,23 @@ router.post('/', async (req, res) => {
      VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
     [garageId, clientId, clientName.trim(), clientPhone, slot.trim(), note]
   );
+
+  // Notifie le propriétaire du garage
+  query<{ owner_id: string }>(
+    `SELECT owner_id FROM garages WHERE id = $1`,
+    [garageId]
+  )
+    .then((g) =>
+      g.rows[0]
+        ? pushToUser(g.rows[0].owner_id, {
+            title: 'Nouvelle demande de rendez-vous',
+            body: `${clientName.trim()} — ${slot.trim()}`,
+            data: { type: 'appointment', appointmentId: rows[0].id },
+          })
+        : undefined
+    )
+    .catch(() => {});
+
   return res.status(201).json(mapAppt(rows[0]));
 });
 
@@ -87,8 +105,9 @@ router.put(
     if (!status || !['accepted', 'declined'].includes(status)) {
       return res.status(400).json({ error: 'status accepted|declined requis' });
     }
-    const check = await query<{ owner_id: string }>(
-      `SELECT g.owner_id FROM appointments a JOIN garages g ON g.id = a.garage_id
+    const check = await query<{ owner_id: string; garage_name: string }>(
+      `SELECT g.owner_id, g.name AS garage_name
+       FROM appointments a JOIN garages g ON g.id = a.garage_id
        WHERE a.id = $1`,
       [req.params.id]
     );
@@ -102,6 +121,17 @@ router.put(
       `UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *`,
       [status, req.params.id]
     );
+
+    // Notifie le client de la décision
+    pushToClient(rows[0].client_id, {
+      title:
+        status === 'accepted'
+          ? 'Rendez-vous accepté ✅'
+          : 'Rendez-vous refusé',
+      body: `${check.rows[0].garage_name} — ${rows[0].slot}`,
+      data: { type: 'appointment', appointmentId: rows[0].id },
+    }).catch(() => {});
+
     return res.json(mapAppt(rows[0]));
   }
 );

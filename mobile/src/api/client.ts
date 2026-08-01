@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config';
 import type {
   Appointment,
   AuthUser,
+  DailyStat,
   Garage,
   GaragesResponse,
   Quote,
@@ -258,6 +259,26 @@ export async function trackGarage(id: string, kind: 'view' | 'call') {
   }
 }
 
+/** Statistiques journalières du garage (propriétaire uniquement). */
+export async function fetchGarageDailyStats(
+  id: string,
+  days = 7
+): Promise<DailyStat[]> {
+  return api<DailyStat[]>(`/api/garages/${id}/stats/daily?days=${days}`, {}, true);
+}
+
+/* ===== Notifications push ===== */
+
+/** Enregistre le jeton push Expo auprès du serveur. */
+export async function registerPushToken(token: string): Promise<void> {
+  const clientId = await getClientId();
+  await api<void>(
+    '/api/push/register',
+    { method: 'POST', body: JSON.stringify({ token, clientId }) },
+    true // associe aussi le compte garage si connecté
+  );
+}
+
 /* ===== Avis ===== */
 
 export async function fetchReviews(garageId: string): Promise<Review[]> {
@@ -367,12 +388,22 @@ export type RouteResult = {
   distanceKm: number;
   durationMin: number;
   straightLine: boolean;
+  /** true si l'itinéraire vient du cache local (mode hors ligne) */
+  fromCache?: boolean;
 };
 
-/** Itinéraire routier via OSRM (gratuit, sans clé). Ligne droite en secours. */
+const ROUTE_CACHE_PREFIX = 'mekano:route:';
+
+/**
+ * Itinéraire routier via OSRM (gratuit, sans clé).
+ * Chaque itinéraire calculé en ligne est mis en cache par garage : hors
+ * ligne, on réaffiche le vrai tracé enregistré au lieu d'une ligne droite.
+ * La ligne droite ne sert plus que d'ultime secours (jamais vu en ligne).
+ */
 export async function fetchRoute(
   from: LatLng,
-  to: LatLng
+  to: LatLng,
+  cacheKey?: string
 ): Promise<RouteResult> {
   try {
     const url =
@@ -384,7 +415,7 @@ export async function fetchRoute(
     const data = await res.json();
     const route = data.routes?.[0];
     if (!route) throw new Error('Pas de route');
-    return {
+    const result: RouteResult = {
       coords: route.geometry.coordinates.map(
         ([lng, lat]: [number, number]) => ({ latitude: lat, longitude: lng })
       ),
@@ -392,8 +423,27 @@ export async function fetchRoute(
       durationMin: route.duration / 60,
       straightLine: false,
     };
+    if (cacheKey) {
+      AsyncStorage.setItem(
+        `${ROUTE_CACHE_PREFIX}${cacheKey}`,
+        JSON.stringify(result)
+      ).catch(() => {});
+    }
+    return result;
   } catch {
-    // Repli : ligne droite + distance haversine
+    // 1er secours : le vrai itinéraire enregistré lors d'une consultation en ligne
+    if (cacheKey) {
+      try {
+        const raw = await AsyncStorage.getItem(`${ROUTE_CACHE_PREFIX}${cacheKey}`);
+        if (raw) {
+          const cached = JSON.parse(raw) as RouteResult;
+          return { ...cached, fromCache: true };
+        }
+      } catch {
+        /* cache illisible : on continue vers la ligne droite */
+      }
+    }
+    // Dernier secours : ligne droite + distance haversine
     const R = 6371;
     const dLat = ((to.latitude - from.latitude) * Math.PI) / 180;
     const dLng = ((to.longitude - from.longitude) * Math.PI) / 180;
