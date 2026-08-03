@@ -4,3 +4,4 @@ dist/
 *.log
 .expo/
 .DS_Store
+*firebase-adminsdk*.json
