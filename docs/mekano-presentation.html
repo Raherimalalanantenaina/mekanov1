@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mekano — Présentation & Mode d'emploi</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: #101617;
+      background: #fff;
+      font-size: 11pt;
+      line-height: 1.45;
+    }
+    h1, h2, h3 { color: #12717A; margin: 0 0 10px; }
+    h1 { font-size: 26pt; letter-spacing: 0.02em; }
+    h2 {
+      font-size: 15pt;
+      border-bottom: 2px solid #12717A;
+      padding-bottom: 6px;
+      margin-top: 0;
+    }
+    h3 { font-size: 12pt; color: #0B5A62; margin-top: 14px; }
+    p { margin: 0 0 8px; }
+    .muted { color: #5F6B6C; }
+    .page { page-break-after: always; padding: 4px 0 8px; }
+    .page:last-child { page-break-after: auto; }
+
+    /* Cover */
+    .cover {
+      min-height: 250mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background:
+        radial-gradient(ellipse at 50% 20%, #EAF3F3 0%, #fff 55%);
+    }
+    .cover img { width: 180px; height: auto; margin-bottom: 18px; }
+    .cover .tag {
+      display: inline-block;
+      background: #12717A;
+      color: #fff;
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin: 12px 0 18px;
+    }
+    .cover .subtitle { font-size: 13pt; color: #5F6B6C; max-width: 420px; }
+    .cover .meta {
+      margin-top: 40px;
+      font-size: 9.5pt;
+      color: #9AA6A7;
+    }
+
+    /* Palette */
+    .swatches { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 18px; }
+    .swatch {
+      width: 92px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #ECEFEF;
+    }
+    .swatch .chip { height: 42px; }
+    .swatch .label {
+      padding: 6px 8px;
+      font-size: 8pt;
+      background: #fff;
+    }
+    .swatch .label strong { display: block; font-size: 9pt; }
+
+    /* Grid */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .card {
+      border: 1px solid #ECEFEF;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #fff;
+    }
+    .card h3 { margin-top: 0; }
+
+    /* Phone mockup */
+    .phones { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin: 14px 0; }
+    .phone {
+      width: 168px;
+      background: #0F1416;
+      border-radius: 22px;
+      padding: 8px 7px 10px;
+      box-shadow: 0 8px 24px rgba(16, 22, 23, 0.18);
+    }
+    .phone .bezel {
+      background: #fff;
+      border-radius: 16px;
+      overflow: hidden;
+      height: 300px;
+      position: relative;
+      font-size: 7.5pt;
+    }
+    .phone.dark .bezel { background: #151B1E; color: #ECF2F2; }
+    .phone .notch {
+      position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+      width: 52px; height: 5px; background: #101617; border-radius: 4px; z-index: 2;
+    }
+    .phone .caption {
+      text-align: center; color: #5F6B6C; font-size: 8.5pt; font-weight: 700;
+      margin-top: 8px;
+    }
+
+    /* Fake UI pieces */
+    .ui-top {
+      background: linear-gradient(135deg, #12717A, #0D5860);
+      color: #fff;
+      padding: 18px 10px 12px;
+    }
+    .ui-top .brand { font-weight: 800; font-size: 11pt; letter-spacing: 0.04em; }
+    .ui-search {
+      margin: 8px 8px 0;
+      background: #F4F7F7;
+      border: 1px solid #ECEFEF;
+      border-radius: 10px;
+      padding: 7px 9px;
+      color: #9AA6A7;
+      font-size: 7pt;
+    }
+    .ui-chips { display: flex; gap: 4px; padding: 8px; flex-wrap: wrap; }
+    .ui-chip {
+      background: #EAF3F3; color: #12717A; border-radius: 999px;
+      padding: 3px 7px; font-size: 6.5pt; font-weight: 700;
+    }
+    .ui-chip.on { background: #12717A; color: #fff; }
+    .ui-card {
+      margin: 0 8px 6px;
+      border: 1px solid #ECEFEF;
+      border-radius: 10px;
+      padding: 8px;
+    }
+    .ui-card .t { font-weight: 800; color: #101617; }
+    .ui-card .s { color: #5F6B6C; font-size: 6.5pt; margin-top: 2px; }
+    .ui-tabs {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      border-top: 1px solid #ECEFEF; background: #fff;
+      display: flex; justify-content: space-around; padding: 6px 2px 8px;
+      font-size: 5.5pt; color: #9AA6A7; text-align: center;
+    }
+    .ui-tabs .a { color: #12717A; font-weight: 800; }
+    .map-bg {
+      height: 100%;
+      background:
+        linear-gradient(160deg, #E8F1F2 0%, #CDE6E1 40%, #9BC8CE 100%);
+      position: relative;
+    }
+    .pin {
+      position: absolute; width: 14px; height: 14px; border-radius: 50%;
+      background: #12717A; border: 2px solid #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,.25);
+    }
+    .pin.amber { background: #F0A72C; }
+    .map-search {
+      position: absolute; top: 22px; left: 8px; right: 8px;
+      background: #fff; border-radius: 10px; padding: 7px 9px;
+      font-size: 6.5pt; color: #9AA6A7;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+    .chat-bubble {
+      max-width: 78%; margin: 6px 8px; padding: 6px 8px; border-radius: 10px;
+      font-size: 6.5pt;
+    }
+    .chat-bubble.me { background: #12717A; color: #fff; margin-left: auto; }
+    .chat-bubble.them { background: #EAF3F3; color: #101617; }
+    .stat-bar {
+      height: 8px; background: #EAF3F3; border-radius: 4px; margin-top: 4px;
+      overflow: hidden;
+    }
+    .stat-bar span { display: block; height: 100%; background: #12717A; width: 65%; }
+
+    ol.steps, ul.feat { padding-left: 18px; margin: 6px 0 12px; }
+    ol.steps li, ul.feat li { margin-bottom: 5px; }
+    .badge {
+      display: inline-block; background: #FBF1DD; color: #C77F0F;
+      font-size: 8pt; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 10px 0;
+    }
+    th, td {
+      border: 1px solid #ECEFEF; padding: 7px 9px; text-align: left;
+    }
+    th { background: #EAF3F3; color: #0B5A62; }
+    .footer-note {
+      margin-top: 16px; font-size: 8.5pt; color: #9AA6A7; text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE 1 — Couverture -->
+  <section class="page cover">
+    <img src="mekano-logo-doc.png" alt="Logo Mekano" />
+    <div class="tag">Application mobile</div>
+    <h1>MEKANO</h1>
+    <p class="subtitle">
+      Trouvez, contactez et gérez des garages près de chez vous —
+      en ligne et hors ligne.
+    </p>
+    <p class="meta">
+      Présentation · Design d’écrans · Mode d’emploi<br />
+      Version 1.0 — Madagascar · 2026
+    </p>
+  </section>
+
+  <!-- PAGE 2 — Identité & design -->
+  <section class="page">
+    <h2>1. Identité visuelle</h2>
+    <div class="grid-2">
+      <div class="card" style="text-align:center;">
+        <img src="mekano-logo-doc.png" alt="Logo" style="width:140px;margin:8px auto;" />
+        <p class="muted" style="font-size:9pt;">
+          Pin de localisation + clé · Teal & ambre<br />
+          Icône, splash et marque dans l’app
+        </p>
+      </div>
+      <div class="card">
+        <h3>Palette Mekano</h3>
+        <div class="swatches">
+          <div class="swatch"><div class="chip" style="background:#12717A;"></div><div class="label"><strong>Teal</strong>#12717A</div></div>
+          <div class="swatch"><div class="chip" style="background:#0B5A62;"></div><div class="label"><strong>Teal dark</strong>#0B5A62</div></div>
+          <div class="swatch"><div class="chip" style="background:#F0A72C;"></div><div class="label"><strong>Ambre</strong>#F0A72C</div></div>
+          <div class="swatch"><div class="chip" style="background:#101617;"></div><div class="label"><strong>Encre</strong>#101617</div></div>
+          <div class="swatch"><div class="chip" style="background:#EAF3F3;"></div><div class="label"><strong>Teal soft</strong>#EAF3F3</div></div>
+          <div class="swatch"><div class="chip" style="background:#F4F7F7;border-bottom:1px solid #ECEFEF;"></div><div class="label"><strong>Fond champ</strong>#F4F7F7</div></div>
+        </div>
+        <p class="muted" style="font-size:9pt;">
+          Design <strong>flat chic</strong> : fonds unis, filets fins, typo forte.
+          Modes <strong>clair</strong> et <strong>sombre</strong>. Langues : français & malagasy.
+        </p>
+      </div>
+    </div>
+
+    <h3>Principes UI</h3>
+    <ul class="feat">
+      <li>Accent principal teal (#12717A), ponctué d’ambre pour les actions importantes / plus proche</li>
+      <li>Cartes plates (peu d’ombres), overlays flottants sur la carte</li>
+      <li>Navigation bas : Liste · Carte · Demandes · Publier · Inbox (si connecté) · Compte</li>
+      <li>Carte vectorielle OpenFreeMap teintée Mekano (styles clair / sombre embarqués)</li>
+    </ul>
+  </section>
+
+  <!-- PAGE 3 — Écrans client -->
+  <section class="page">
+    <h2>2. Design d’écrans — Client</h2>
+    <div class="phones">
+      <!-- Liste -->
+      <div>
+        <div class="phone">
+          <div class="bezel">
+            <div class="notch"></div>
+            <div class="ui-top">
+              <div class="brand">MEKANO</div>
+              <div style="opacity:.85;font-size:6.5pt;margin-top:2px;">Garages près de vous</div>
+            </div>
+            <div class="ui-search">🔍  Vidange, lavage…</div>
+            <div class="ui-chips">
+              <span class="ui-chip on">vidange</span>
+              <span class="ui-chip">freins</span>
+              <span class="ui-chip">lavage</span>
+              <span class="ui-chip">pneus</span>
+            </div>
+            <div class="ui-card"><div class="t">Mekano Centre</div><div class="s">Antananarivo · 1,2 km · ★ 4.5</div></div>
+            <div class="ui-card"><div class="t">Garage Behoririka</div><div class="s">Antananarivo · 2,4 km</div></div>
+            <div class="ui-card"><div class="t">Atelier Ivato</div><div class="s">4x4 · suspension</div></div>
+            <div class="ui-tabs">
+              <span class="a">Liste</span><span>Carte</span><span>Demandes</span><span>Compte</span>
+            </div>
+          </div>
+        </div>
+        <div class="phone caption">Liste / Accueil</div>
+      </div>
+
+      <!-- Carte -->
+      <div>
+        <div class="phone">
+          <div class="bezel">
+            <div class="notch"></div>
+            <div class="map-bg">
+              <div class="map-search">🔍  Rechercher un garage…</div>
+              <div class="pin" style="top:42%;left:48%;"></div>
+              <div class="pin amber" style="top:55%;left:62%;"></div>
+              <div class="pin" style="top:38%;left:30%;"></div>
+              <div class="pin" style="top:68%;left:40%;"></div>
+              <div style="position:absolute;bottom:36px;left:8px;right:8px;background:#fff;border-radius:10px;padding:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);">
+                <div style="font-weight:800;font-size:7.5pt;">Mekano Centre</div>
+                <div style="color:#5F6B6C;font-size:6pt;">Antananarivo · 1,2 km</div>
+              </div>
+              <div class="ui-tabs">
+                <span>Liste</span><span class="a">Carte</span><span>Demandes</span><span>Compte</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="phone caption">Carte interactive</div>
+      </div>
+
+      <!-- Demandes -->
+      <div>
+        <div class="phone">
+          <div class="bezel">
+            <div class="notch"></div>
+            <div style="padding:20px 10px 8px;">
+              <div style="font-weight:800;font-size:10pt;color:#12717A;">Mes demandes</div>
+              <div class="ui-chips" style="padding-left:0;">
+                <span class="ui-chip on">Devis</span>
+                <span class="ui-chip">RDV</span>
+              </div>
+              <div class="chat-bubble them">Bonjour, freins qui couinent…</div>
+              <div class="chat-bubble me">Ok, venez demain 9h</div>
+              <div class="chat-bubble them">📷 Photo du problème</div>
+              <div class="ui-card" style="margin-top:10px;">
+                <div class="t">Garage Behoririka</div>
+                <div class="s">Statut : répondu</div>
+              </div>
+            </div>
+            <div class="ui-tabs">
+              <span>Liste</span><span>Carte</span><span class="a">Demandes</span><span>Compte</span>
+            </div>
+          </div>
+        </div>
+        <div class="phone caption">Chat / Devis</div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:9pt;text-align:center;">
+      Filtres rapides (vidange, freins, lavage…) · GPS · favoris · mode hors ligne
+    </p>
+  </section>
+
+  <!-- PAGE 4 — Écrans garage -->
+  <section class="page">
+    <h2>3. Design d’écrans — Garage</h2>
+    <div class="phones">
+      <div>
+        <div class="phone">
+          <div class="bezel">
+            <div class="notch"></div>
+            <div style="padding:20px 10px 8px;">
+              <div style="font-weight:800;font-size:10pt;color:#12717A;">Mon garage</div>
+              <div class="ui-card" style="margin-top:8px;">
+                <div class="t">Mekano Centre</div>
+                <div class="s">✓ Approuvé · Ouvert</div>
+                <div class="stat-bar"><span></span></div>
+                <div class="s" style="margin-top:4px;">Vues 128 · Appels 14</div>
+              </div>
+              <div class="ui-chips">
+                <span class="ui-chip on">vidange</span>
+                <span class="ui-chip on">lavage</span>
+                <span class="ui-chip">freins</span>
+                <span class="ui-chip">diagnostic</span>
+              </div>
+              <div style="margin:8px;height:48px;border-radius:10px;background:linear-gradient(90deg,#EAF3F3,#CDE6E1);border:1px dashed #12717A;display:flex;align-items:center;justify-content:center;color:#12717A;font-weight:700;font-size:7pt;">
+                + Photos (max 12)
+              </div>
+            </div>
+            <div class="ui-tabs">
+              <span>Liste</span><span>Carte</span><span class="a">Publier</span><span>Inbox</span>
+            </div>
+          </div>
+        </div>
+        <div class="phone caption">Publier / Éditer</div>
+      </div>
+
+      <div>
+        <div class="phone">
+          <div class="bezel">
+            <div class="notch"></div>
+            <div style="padding:20px 10px 8px;">
+              <div style="font-weight:800;font-size:10pt;color:#12717A;">Boîte de réception</div>
+              <div class="ui-chips" style="padding-left:0;">
+                <span class="ui-chip on">Devis (3)</span>
+                <span class="ui-chip">RDV (1)</span>
+              </div>
+              <div class="ui-card"><div class="t">Rakoto Jean</div><div class="s">Lavage extérieur · il y a 5 min</div></div>
+              <div class="ui-card"><div class="t">Soa Marie</div><div class="s">Freins · en attente</div></div>
+              <div class="ui-card"><div class="t">RDV 14h30</div><div class="s"><span class="badge">À accepter</span></div></div>
+            </div>
+            <div class="ui-tabs">
+              <span>Liste</span><span>Carte</span><span>Publier</span><span class="a">Inbox</span>
+            </div>
+          </div>
+        </div>
+        <div class="phone caption">Inbox garage</div>
+      </div>
+
+      <div>
+        <div class="phone dark">
+          <div class="bezel">
+            <div class="notch"></div>
+            <div class="ui-top">
+              <div class="brand">MEKANO</div>
+              <div style="opacity:.85;font-size:6.5pt;margin-top:2px;">Mode sombre</div>
+            </div>
+            <div class="ui-search" style="background:#1C2427;border-color:#232B2E;color:#66767A;">🔍  Recherche…</div>
+            <div class="ui-card" style="background:#151B1E;border-color:#232B2E;">
+              <div class="t" style="color:#ECF2F2;">Mekano Centre</div>
+              <div class="s" style="color:#9DACAE;">Antananarivo · ouvert</div>
+            </div>
+            <div class="ui-card" style="background:#151B1E;border-color:#232B2E;">
+              <div class="t" style="color:#ECF2F2;">Garage Behoririka</div>
+              <div class="s" style="color:#9DACAE;">Climatisation · lavage</div>
+            </div>
+            <div class="ui-tabs" style="background:#0F1416;border-color:#232B2E;color:#66767A;">
+              <span class="a" style="color:#2FA8B4;">Liste</span><span>Carte</span><span>Demandes</span><span>Compte</span>
+            </div>
+          </div>
+        </div>
+        <div class="phone caption">Thème sombre</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 5 — Mode d'emploi client -->
+  <section class="page">
+    <h2>4. Mode d’emploi — Client (automobiliste)</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Trouver un garage</h3>
+        <ol class="steps">
+          <li>Ouvrir l’onglet <strong>Liste</strong> ou <strong>Carte</strong>.</li>
+          <li>Autoriser la localisation GPS pour le tri par distance.</li>
+          <li>Utiliser la recherche ou un filtre (vidange, lavage…).</li>
+          <li>Toucher une fiche pour voir détail, avis, horaires, photos.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Demander un devis</h3>
+        <ol class="steps">
+          <li>Sur la fiche garage → <strong>Demander un devis</strong>.</li>
+          <li>Saisir nom, téléphone, description (+ photo optionnelle).</li>
+          <li>Suivre la conversation dans <strong>Demandes</strong>.</li>
+          <li>L’historique reste en base et en cache local.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Prendre rendez-vous</h3>
+        <ol class="steps">
+          <li>Sur la fiche → choisir un créneau RDV.</li>
+          <li>Le garage accepte ou refuse dans son Inbox.</li>
+          <li>Statut visible dans l’onglet Demandes → RDV.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Itinéraire & hors ligne</h3>
+        <ol class="steps">
+          <li><strong>Itinéraire</strong> : tracé routier vers le garage.</li>
+          <li><strong>Hors ligne</strong> : consultation du cache (liste / carte déjà vues).</li>
+          <li>Bannière jaune = données en cache, pas de sync.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 6 — Mode d'emploi garage -->
+  <section class="page">
+    <h2>5. Mode d’emploi — Propriétaire de garage</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Créer un compte</h3>
+        <ol class="steps">
+          <li>Onglet <strong>Compte / Garage</strong> → Inscription.</li>
+          <li>Email + mot de passe + nom.</li>
+          <li>Attendre la <strong>validation admin</strong> par email (Valider / Refuser).</li>
+          <li>Une fois approuvé → publier la fiche garage.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Publier / modifier la fiche</h3>
+        <ol class="steps">
+          <li>Onglet <strong>Publier</strong> : nom, adresse, GPS, téléphone.</li>
+          <li>Cocher les services (dont <strong>lavage</strong>).</li>
+          <li>Ajouter jusqu’à <strong>12 photos</strong> + tarifs + horaires.</li>
+          <li>Enregistrer → validation admin si nouvelle fiche.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Gérer les clients</h3>
+        <ol class="steps">
+          <li>Onglet <strong>Inbox</strong> : devis reçus + chat.</li>
+          <li>Répondre (texte / photo) ou utiliser réponses rapides.</li>
+          <li>Accepter / refuser les rendez-vous.</li>
+          <li>Consulter les stats (vues, appels, recherches).</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Règles importantes</h3>
+        <ul class="feat">
+          <li><strong>1 compte = 1 garage</strong></li>
+          <li>Photos & conversations stockées en <strong>PostgreSQL</strong></li>
+          <li>Compte non validé → impossible de publier</li>
+          <li>Garage non validé → invisible sur liste / carte</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:18px;">Compte démo (tests)</h3>
+    <table>
+      <tr><th>Email</th><th>Mot de passe</th></tr>
+      <tr><td>garage@mekano.app … garage4@mekano.app</td><td>garage123</td></tr>
+    </table>
+  </section>
+
+  <!-- PAGE 7 — Synthèse -->
+  <section class="page">
+    <h2>6. Fonctionnalités en un coup d’œil</h2>
+    <table>
+      <tr><th>Fonction</th><th>Client</th><th>Garage</th></tr>
+      <tr><td>Liste & filtres (dont lavage)</td><td>✓</td><td>—</td></tr>
+      <tr><td>Carte Mekano (online / offline)</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Détail, appel, itinéraire, avis</td><td>✓</td><td>—</td></tr>
+      <tr><td>Devis + chat + photos</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Rendez-vous</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Publication fiche + photos</td><td>—</td><td>✓</td></tr>
+      <tr><td>Inbox & statistiques</td><td>—</td><td>✓</td></tr>
+      <tr><td>Thème clair / sombre · FR / MG</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Mode hors ligne (cache)</td><td>✓</td><td>consultation</td></tr>
+    </table>
+
+    <div class="card" style="margin-top:18px;background:#EAF3F3;border-color:#CDE6E1;">
+      <h3 style="margin-top:0;">Contact admin validation</h3>
+      <p>Les demandes de validation de comptes et garages partent vers l’email administrateur configuré (<code>ADMIN_EMAIL</code>).</p>
+      <p class="muted" style="margin-bottom:0;font-size:9pt;">
+        API prod : https://mekanov1.onrender.com · App Android via EAS Build
+      </p>
+    </div>
+
+    <p class="footer-note">
+      © Mekano 2026 — Document de présentation & mode d’emploi · Ne pas diffuser sans autorisation
+    </p>
+  </section>
+
+</body>
+</html>
