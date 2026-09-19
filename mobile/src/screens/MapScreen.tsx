@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,13 +25,14 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { fetchGarages } from '../api/client';
+import { GarageMapPin } from '../components/GarageMapPin';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { BouncyPressable } from '../components/Pressable';
 import { UserLocationMarker } from '../components/UserLocationMarker';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
-import { OSM_STYLE, circlePolygon, zoomForDelta } from '../map/osm';
+import { mapStyleFor, circlePolygon, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
 import type { RootStackParamList } from '../navigation/types';
@@ -58,9 +60,10 @@ export function MapScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { offline } = useAuth();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const mapStyle = React.useMemo(() => mapStyleFor(mode), [mode]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
@@ -195,7 +198,7 @@ export function MapScreen() {
       <MapLibreMap
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        mapStyle={OSM_STYLE}
+        mapStyle={mapStyle}
         onPress={(e) => {
           const [lng, lat] = e.nativeEvent.lngLat;
           onMapPress(lng, lat);
@@ -218,14 +221,16 @@ export function MapScreen() {
             <Layer
               id="radius-fill"
               type="fill"
-              paint={{ 'fill-color': 'rgba(18,113,122,0.08)' }}
+              paint={{ 'fill-color': colors.teal, 'fill-opacity': 0.1 }}
             />
             <Layer
               id="radius-line"
               type="line"
               paint={{
-                'line-color': 'rgba(18,113,122,0.8)',
-                'line-width': 2,
+                'line-color': colors.teal,
+                'line-width': 2.5,
+                'line-opacity': 0.75,
+                'line-dasharray': [2, 1.5],
               }}
             />
           </GeoJSONSource>
@@ -247,26 +252,10 @@ export function MapScreen() {
             <Marker
               key={g.id}
               lngLat={[g.longitude, g.latitude]}
-              anchor="center"
+              anchor="bottom"
               onPress={() => focusGarage(g)}
             >
-              <View collapsable={false} style={styles.markerWrap}>
-                <View
-                  style={[
-                    styles.marker,
-                    isNearest && styles.markerNearest,
-                    isSelected && styles.markerActive,
-                  ]}
-                >
-                  <Ionicons
-                    name={isNearest ? 'flash' : 'construct'}
-                    size={15}
-                    color={
-                      isNearest || isSelected ? colors.tealDeep : colors.white
-                    }
-                  />
-                </View>
-              </View>
+              <GarageMapPin nearest={isNearest} selected={isSelected} />
             </Marker>
           );
         })}
@@ -431,9 +420,13 @@ export function MapScreen() {
           exiting={FadeOut.duration(150)}
           style={[styles.sheet, shadow.float, { bottom: 16 + insets.bottom }]}
         >
-          <View style={styles.sheetIcon}>
-            <Ionicons name="construct" size={22} color={colors.teal} />
-          </View>
+          {selected.photos?.[0] ? (
+            <Image source={{ uri: selected.photos[0] }} style={styles.sheetPhoto} />
+          ) : (
+            <View style={styles.sheetIcon}>
+              <Ionicons name="construct" size={22} color={colors.teal} />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={styles.sheetName} numberOfLines={1}>
               {selected.name}
@@ -482,7 +475,7 @@ const createStyles = (colors: ThemeColors) =>
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     paddingHorizontal: 15,
     height: 50,
   },
@@ -520,27 +513,6 @@ const createStyles = (colors: ThemeColors) =>
     color: colors.muted,
   },
   radiusTextActive: { color: colors.white },
-  markerWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 44,
-    height: 44,
-  },
-  marker: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.teal,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2.5,
-    borderColor: colors.white,
-  },
-  markerNearest: { backgroundColor: colors.amber },
-  markerActive: {
-    backgroundColor: colors.amber,
-    transform: [{ scale: 1.15 }],
-  },
   locateBtn: {
     position: 'absolute',
     right: 16,
@@ -605,12 +577,18 @@ const createStyles = (colors: ThemeColors) =>
     padding: 15,
   },
   sheetIcon: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     borderRadius: radii.md,
     backgroundColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sheetPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.md,
+    backgroundColor: colors.field,
   },
   sheetName: { fontWeight: font.extrabold, fontSize: 15.5, color: colors.ink },
   sheetInfo: { color: colors.muted, fontSize: 12.5, marginTop: 2 },

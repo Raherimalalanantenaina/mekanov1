@@ -65,6 +65,13 @@ router.post('/', async (req, res) => {
     [garageId, clientId, clientName.trim(), clientPhone, description.trim(), photo]
   );
 
+  // Premier message du fil = la demande initiale (historique durable)
+  await query(
+    `INSERT INTO quote_messages (request_id, sender, body, photo)
+     VALUES ($1, 'client', $2, $3)`,
+    [rows[0].id, description.trim(), photo || '']
+  );
+
   // Notifie le propriétaire du garage (sans bloquer la réponse)
   query<{ owner_id: string; name: string }>(
     `SELECT owner_id, name FROM garages WHERE id = $1`,
@@ -81,7 +88,11 @@ router.post('/', async (req, res) => {
     )
     .catch(() => {});
 
-  return res.status(201).json(mapQuote(rows[0]));
+  return res.status(201).json({
+    ...mapQuote(rows[0]),
+    messageCount: 1,
+    lastMessageAt: rows[0].created_at,
+  });
 });
 
 /** Client : mes demandes */

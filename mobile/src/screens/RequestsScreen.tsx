@@ -40,11 +40,13 @@ export function RequestsScreen() {
     setLoading(true);
     try {
       const [q, a] = await Promise.all([
-        fetchMyQuotes().catch(() => [] as Quote[]),
-        fetchMyAppointments().catch(() => [] as Appointment[]),
+        fetchMyQuotes(),
+        fetchMyAppointments(),
       ]);
       setQuotes(q);
       setAppts(a);
+    } catch {
+      /* garde la dernière liste affichée si le réseau échoue */
     } finally {
       setLoading(false);
     }
@@ -56,9 +58,29 @@ export function RequestsScreen() {
     }, [reload])
   );
 
+  // Recharge le fil quand on revient sur l'écran avec un chat ouvert
+  useFocusEffect(
+    useCallback(() => {
+      if (!openQuote) return;
+      let cancelled = false;
+      fetchQuoteMessages(openQuote.id)
+        .then((m) => {
+          if (!cancelled) setMessages(m);
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }, [openQuote])
+  );
+
   const openChat = async (q: Quote) => {
     setOpenQuote(q);
-    setMessages(await fetchQuoteMessages(q.id));
+    try {
+      setMessages(await fetchQuoteMessages(q.id));
+    } catch {
+      setMessages([]);
+    }
   };
 
   const send = async (body: string, photo: string) => {

@@ -88,7 +88,7 @@ router.get('/', async (req, res) => {
   if (q) {
     params.push(`%${q}%`);
     where.push(
-      `(name ILIKE $${params.length} OR description ILIKE $${params.length} OR address ILIKE $${params.length} OR city ILIKE $${params.length})`
+      `(name ILIKE $${params.length} OR description ILIKE $${params.length} OR address ILIKE $${params.length} OR city ILIKE $${params.length} OR EXISTS (SELECT 1 FROM unnest(services) AS s WHERE s ILIKE $${params.length}))`
     );
   }
   if (city) {

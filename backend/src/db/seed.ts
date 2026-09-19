@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import { pool } from './pool';
 
 // Règle : un compte = un garage. Chaque garage de démo a son propre compte.
+// Le seed ne SUPPRIME jamais un garage existant (sinon CASCADE efface
+// photos, devis, messages et RDV). Il crée ou met à jour sans toucher aux photos.
 const samples = [
   {
     email: 'garage@mekano.app',
@@ -13,7 +15,7 @@ const samples = [
     phone: '+261 34 00 000 01',
     latitude: -18.8792,
     longitude: 47.5079,
-    services: ['vidange', 'freins', 'diagnostic', 'pneus'],
+    services: ['vidange', 'freins', 'diagnostic', 'pneus', 'lavage'],
   },
   {
     email: 'garage2@mekano.app',
@@ -25,7 +27,7 @@ const samples = [
     phone: '+261 34 00 000 02',
     latitude: -18.9036,
     longitude: 47.5215,
-    services: ['moteur', 'climatisation', 'batterie'],
+    services: ['moteur', 'climatisation', 'batterie', 'lavage'],
   },
   {
     email: 'garage3@mekano.app',
@@ -60,32 +62,83 @@ async function seed() {
     const owner = await pool.query<{ id: string }>(
       `INSERT INTO users (email, password_hash, full_name, role, status)
        VALUES ($1, $2, $3, 'garage', 'approved')
-       ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name, status = 'approved'
+       ON CONFLICT (email) DO UPDATE SET
+         password_hash = EXCLUDED.password_hash,
+         full_name = EXCLUDED.full_name,
+         status = 'approved'
        RETURNING id`,
       [g.email, passwordHash, g.ownerName]
     );
     const ownerId = owner.rows[0].id;
 
-    await pool.query(`DELETE FROM garages WHERE owner_id = $1`, [ownerId]);
-    await pool.query(
-      `INSERT INTO garages
-        (owner_id, name, description, address, city, phone, latitude, longitude, services, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'approved')`,
-      [
-        ownerId,
-        g.name,
-        g.description,
-        g.address,
-        g.city,
-        g.phone,
-        g.latitude,
-        g.longitude,
-        g.services,
-      ]
+    const existing = await pool.query<{ id: string }>(
+      `SELECT id FROM garages WHERE owner_id = $1 LIMIT 1`,
+      [ownerId]
     );
+
+    if (existing.rows[0]) {
+      // Met à jour la fiche démo SANS toucher photos / stats / horaires perso
+      await pool.query(
+        `UPDATE garages SET
+           name = $2,
+           description = $3,
+           address = $4,
+           city = $5,
+           phone = $6,
+           latitude = $7,
+           longitude = $8,
+           services = $9,
+           status = 'approved',
+           updated_at = NOW()
+         WHERE id = $1`,
+        [
+          existing.rows[0].id,
+          g.name,
+          g.description,
+          g.address,
+          g.city,
+          g.phone,
+          g.latitude,
+          g.longitude,
+          g.services,
+        ]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO garages
+          (owner_id, name, description, address, city, phone, latitude, longitude, services, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'approved')`,
+        [
+          ownerId,
+          g.name,
+          g.description,
+          g.address,
+          g.city,
+          g.phone,
+          g.latitude,
+          g.longitude,
+          g.services,
+        ]
+      );
+    }
   }
 
-  console.log('Seed OK — garage@mekano.app … garage4@mekano.app / garage123');
+  // Anciennes demandes sans message : crée le 1er message depuis la description
+  const backfill = await pool.query(
+    `INSERT INTO quote_messages (request_id, sender, body, photo)
+     SELECT q.id, 'client', q.description, q.photo
+     FROM quote_requests q
+     WHERE NOT EXISTS (
+       SELECT 1 FROM quote_messages m WHERE m.request_id = q.id
+     )`
+  );
+
+  console.log(
+    `Seed OK — garage@mekano.app … garage4@mekano.app / garage123` +
+      (backfill.rowCount
+        ? ` (${backfill.rowCount} message(s) d’historique restauré(s))`
+        : ' (données existantes conservées)')
+  );
   await pool.end();
 }
 

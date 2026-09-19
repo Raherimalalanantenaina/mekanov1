@@ -14,10 +14,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { fetchRoute, LatLng, RouteResult } from '../api/client';
 import { BouncyPressable } from '../components/Pressable';
+import { GarageMapPin } from '../components/GarageMapPin';
 import { UserLocationMarker } from '../components/UserLocationMarker';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
-import { OSM_STYLE, boundsOf, zoomForDelta } from '../map/osm';
+import { mapStyleFor, boundsOf, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -25,9 +26,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Route'>;
 
 export function RouteScreen({ route, navigation }: Props) {
   const { garageId, name, latitude, longitude } = route.params;
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const { t } = useI18n();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const mapStyle = React.useMemo(() => mapStyleFor(mode), [mode]);
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
   const [userPos, setUserPos] = useState<LatLng | null>(null);
@@ -66,7 +68,7 @@ export function RouteScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={OSM_STYLE}>
+      <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={mapStyle}>
         <Camera
           ref={cameraRef}
           initialViewState={{
@@ -126,10 +128,8 @@ export function RouteScreen({ route, navigation }: Props) {
             <UserLocationMarker />
           </Marker>
         )}
-        <Marker lngLat={[longitude, latitude]} anchor="center">
-          <View style={styles.destMarker}>
-            <Ionicons name="construct" size={15} color={colors.tealDeep} />
-          </View>
+        <Marker lngLat={[longitude, latitude]} anchor="bottom">
+          <GarageMapPin selected />
         </Marker>
       </MapLibreMap>
 
@@ -187,16 +187,6 @@ const createStyles = (colors: ThemeColors) =>
     borderColor: colors.line,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  destMarker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2.5,
-    borderColor: colors.white,
   },
   panel: {
     position: 'absolute',

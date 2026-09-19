@@ -17,6 +17,10 @@ const TOKEN_KEY = 'mekano:token';
 const USER_KEY = 'mekano:user';
 const CLIENT_ID_KEY = 'mekano:clientId';
 const FAVORITES_KEY = 'mekano:favorites';
+const QUOTES_CACHE_KEY = 'mekano:quotes:client:v1';
+const GARAGE_QUOTES_CACHE_KEY = 'mekano:quotes:garage:v1';
+const MSGS_CACHE_PREFIX = 'mekano:quote-msgs:';
+const APPTS_CACHE_KEY = 'mekano:appts:client:v1';
 
 /** Identifiant anonyme de l'appareil (clients sans compte). */
 export async function getClientId(): Promise<string> {
@@ -69,17 +73,101 @@ export async function getCachedUser(): Promise<AuthUser | null> {
 }
 
 export async function getCachedGarages(): Promise<GaragesResponse | null> {
-  const raw = await AsyncStorage.getItem(CACHE_KEY);
-  if (!raw) return null;
-  const data = JSON.parse(raw) as GaragesResponse;
-  return { ...data, offline: true };
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as GaragesResponse;
+    return { ...data, offline: true };
+  } catch {
+    return null;
+  }
 }
 
-async function cacheGarages(payload: GaragesResponse) {
-  await AsyncStorage.setItem(
-    CACHE_KEY,
-    JSON.stringify({ ...payload, offline: false })
-  );
+/** Réduit les photos pour tenir dans AsyncStorage (~6 Mo). */
+function slimGarage(g: Garage): Garage {
+  return { ...g, photos: g.photos?.length ? [g.photos[0]] : [] };
+}
+
+/**
+ * Persiste la liste des garages. Si le payload (photos base64) est trop gros,
+ * on retente avec 1 photo max par garage — sans jamais faire échouer l'appel réseau.
+ */
+async function cacheGarages(payload: GaragesResponse): Promise<void> {
+  const base = {
+    ...payload,
+    offline: false,
+    syncedAt: payload.syncedAt ?? new Date().toISOString(),
+  };
+  try {
+    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(base));
+    return;
+  } catch {
+    /* payload trop volumineux */
+  }
+  try {
+    await AsyncStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        ...base,
+        garages: base.garages.map(slimGarage),
+      })
+    );
+  } catch {
+    /* cache indisponible : l'UI utilise quand même la réponse API */
+  }
+}
+
+/** Fusionne / met à jour un garage dans le cache local (ex. après update photos). */
+export async function upsertCachedGarage(garage: Garage): Promise<void> {
+  const existing = await getCachedGarages();
+  const list = existing?.garages ?? [];
+  const idx = list.findIndex((g) => g.id === garage.id);
+  const next =
+    idx >= 0
+      ? list.map((g, i) => (i === idx ? { ...g, ...garage } : g))
+      : [garage, ...list];
+  await cacheGarages({
+    garages: next,
+    syncedAt: new Date().toISOString(),
+    offline: false,
+  });
+}
+
+async function mergeGaragesIntoCache(incoming: Garage[]): Promise<void> {
+  const existing = await getCachedGarages();
+  const byId = new Map<string, Garage>();
+  for (const g of existing?.garages ?? []) byId.set(g.id, g);
+  for (const g of incoming) {
+    const prev = byId.get(g.id);
+    // Ne pas écraser des photos riches déjà en cache par une entrée sans photo
+    if (prev && !(g.photos?.length) && prev.photos?.length) {
+      byId.set(g.id, { ...prev, ...g, photos: prev.photos });
+    } else {
+      byId.set(g.id, { ...prev, ...g });
+    }
+  }
+  await cacheGarages({
+    garages: Array.from(byId.values()),
+    syncedAt: new Date().toISOString(),
+    offline: false,
+  });
+}
+
+async function readJsonCache<T>(key: string): Promise<T | null> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeJsonCache(key: string, value: unknown): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore quota */
+  }
 }
 
 async function api<T>(
@@ -139,7 +227,9 @@ export async function fetchGarages(params?: {
           (g) =>
             g.name.toLowerCase().includes(q) ||
             g.city.toLowerCase().includes(q) ||
-            g.address.toLowerCase().includes(q)
+            g.address.toLowerCase().includes(q) ||
+            (g.description ?? '').toLowerCase().includes(q) ||
+            g.services?.some((s) => s.toLowerCase().includes(q))
         );
       }
       if (params?.city) {
@@ -156,11 +246,31 @@ export async function fetchGarages(params?: {
     const data = await api<GaragesResponse>(
       `/api/garages?${query.toString()}`
     );
-    await cacheGarages(data);
+    // Ne jamais laisser un échec de cache masquer la réponse fraîche du serveur
+    const isSearch = Boolean(params?.q || params?.city);
+    if (isSearch) {
+      void mergeGaragesIntoCache(data.garages);
+    } else {
+      void cacheGarages(data);
+    }
     return { ...data, offline: false };
   } catch (err) {
     const cached = await getCachedGarages();
-    if (cached) return cached;
+    if (cached) {
+      let list = cached.garages;
+      if (params?.q) {
+        const q = params.q.toLowerCase();
+        list = list.filter(
+          (g) =>
+            g.name.toLowerCase().includes(q) ||
+            g.city.toLowerCase().includes(q) ||
+            g.address.toLowerCase().includes(q) ||
+            (g.description ?? '').toLowerCase().includes(q) ||
+            g.services?.some((s) => s.toLowerCase().includes(q))
+        );
+      }
+      return { ...cached, offline: true, garages: list };
+    }
     throw err;
   }
 }
@@ -174,7 +284,9 @@ export async function fetchGarageById(id: string): Promise<Garage> {
     throw new Error('Garage indisponible hors ligne');
   }
   try {
-    return await api<Garage>(`/api/garages/${id}`);
+    const garage = await api<Garage>(`/api/garages/${id}`);
+    void upsertCachedGarage(garage);
+    return garage;
   } catch (err) {
     const cached = await getCachedGarages();
     const found = cached?.garages.find((g) => g.id === id);
@@ -227,26 +339,37 @@ export async function createGarage(
     longitude: number;
   }
 ): Promise<Garage> {
-  return api<Garage>(
+  const garage = await api<Garage>(
     '/api/garages',
     { method: 'POST', body: JSON.stringify(payload) },
     true
   );
+  void upsertCachedGarage(garage);
+  return garage;
 }
 
 export async function updateGarage(
   id: string,
   payload: Partial<Garage>
 ): Promise<Garage> {
-  return api<Garage>(
+  const garage = await api<Garage>(
     `/api/garages/${id}`,
     { method: 'PUT', body: JSON.stringify(payload) },
     true
   );
+  void upsertCachedGarage(garage);
+  return garage;
 }
 
 export async function deleteGarage(id: string): Promise<void> {
   await api<void>(`/api/garages/${id}`, { method: 'DELETE' }, true);
+  const cached = await getCachedGarages();
+  if (cached) {
+    void cacheGarages({
+      ...cached,
+      garages: cached.garages.filter((g) => g.id !== id),
+    });
+  }
 }
 
 /* ===== Statistiques ===== */
@@ -305,25 +428,78 @@ export async function createQuote(payload: {
   photo?: string;
 }): Promise<Quote> {
   const clientId = await getClientId();
-  return api<Quote>('/api/quotes', {
+  const quote = await api<Quote>('/api/quotes', {
     method: 'POST',
     body: JSON.stringify({ ...payload, clientId }),
   });
+  const cached = (await readJsonCache<Quote[]>(QUOTES_CACHE_KEY)) ?? [];
+  await writeJsonCache(QUOTES_CACHE_KEY, [
+    quote,
+    ...cached.filter((q) => q.id !== quote.id),
+  ]);
+  const seed: QuoteMessage = {
+    id: `local-${quote.id}`,
+    sender: 'client',
+    body: quote.description,
+    photo: quote.photo ?? '',
+    createdAt: quote.createdAt,
+  };
+  await writeJsonCache(`${MSGS_CACHE_PREFIX}${quote.id}`, [seed]);
+  return quote;
 }
 
 export async function fetchMyQuotes(): Promise<Quote[]> {
   const clientId = await getClientId();
-  return api<Quote[]>(`/api/quotes/client/${clientId}`);
+  const cached = await readJsonCache<Quote[]>(QUOTES_CACHE_KEY);
+  try {
+    if (!(await isOnline())) {
+      if (cached) return cached;
+      throw new Error('Hors ligne');
+    }
+    const quotes = await api<Quote[]>(`/api/quotes/client/${clientId}`);
+    await writeJsonCache(QUOTES_CACHE_KEY, quotes);
+    return quotes;
+  } catch (err) {
+    if (cached) return cached;
+    throw err;
+  }
 }
 
 export async function fetchReceivedQuotes(): Promise<Quote[]> {
-  return api<Quote[]>('/api/quotes/mine', {}, true);
+  const cached = await readJsonCache<Quote[]>(GARAGE_QUOTES_CACHE_KEY);
+  try {
+    if (!(await isOnline())) {
+      if (cached) return cached;
+      throw new Error('Hors ligne');
+    }
+    const quotes = await api<Quote[]>('/api/quotes/mine', {}, true);
+    await writeJsonCache(GARAGE_QUOTES_CACHE_KEY, quotes);
+    return quotes;
+  } catch (err) {
+    if (cached) return cached;
+    throw err;
+  }
 }
 
 export async function fetchQuoteMessages(
   quoteId: string
 ): Promise<QuoteMessage[]> {
-  return api<QuoteMessage[]>(`/api/quotes/${quoteId}/messages`);
+  const key = `${MSGS_CACHE_PREFIX}${quoteId}`;
+  const cached = await readJsonCache<QuoteMessage[]>(key);
+  try {
+    if (!(await isOnline())) {
+      if (cached) return cached;
+      throw new Error('Hors ligne');
+    }
+    const messages = await api<QuoteMessage[]>(
+      `/api/quotes/${quoteId}/messages`
+    );
+    await writeJsonCache(key, messages);
+    return messages;
+  } catch (err) {
+    if (cached) return cached;
+    throw err;
+  }
 }
 
 export async function sendQuoteMessage(
@@ -334,11 +510,18 @@ export async function sendQuoteMessage(
 ): Promise<QuoteMessage> {
   const payload: Record<string, string> = { sender, body, photo };
   if (sender === 'client') payload.clientId = await getClientId();
-  return api<QuoteMessage>(
+  const msg = await api<QuoteMessage>(
     `/api/quotes/${quoteId}/messages`,
     { method: 'POST', body: JSON.stringify(payload) },
     sender === 'garage'
   );
+  const key = `${MSGS_CACHE_PREFIX}${quoteId}`;
+  const prev = (await readJsonCache<QuoteMessage[]>(key)) ?? [];
+  await writeJsonCache(
+    key,
+    prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+  );
+  return msg;
 }
 
 /* ===== Rendez-vous ===== */
@@ -351,15 +534,35 @@ export async function createAppointment(payload: {
   note?: string;
 }): Promise<Appointment> {
   const clientId = await getClientId();
-  return api<Appointment>('/api/appointments', {
+  const appt = await api<Appointment>('/api/appointments', {
     method: 'POST',
     body: JSON.stringify({ ...payload, clientId }),
   });
+  const cached = (await readJsonCache<Appointment[]>(APPTS_CACHE_KEY)) ?? [];
+  await writeJsonCache(APPTS_CACHE_KEY, [
+    appt,
+    ...cached.filter((a) => a.id !== appt.id),
+  ]);
+  return appt;
 }
 
 export async function fetchMyAppointments(): Promise<Appointment[]> {
   const clientId = await getClientId();
-  return api<Appointment[]>(`/api/appointments/client/${clientId}`);
+  const cached = await readJsonCache<Appointment[]>(APPTS_CACHE_KEY);
+  try {
+    if (!(await isOnline())) {
+      if (cached) return cached;
+      throw new Error('Hors ligne');
+    }
+    const appts = await api<Appointment[]>(
+      `/api/appointments/client/${clientId}`
+    );
+    await writeJsonCache(APPTS_CACHE_KEY, appts);
+    return appts;
+  } catch (err) {
+    if (cached) return cached;
+    throw err;
+  }
 }
 
 export async function fetchReceivedAppointments(): Promise<Appointment[]> {

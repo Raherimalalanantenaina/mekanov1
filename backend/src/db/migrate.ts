@@ -116,6 +116,14 @@ CREATE TABLE IF NOT EXISTS garage_stats_daily (
   searches INT NOT NULL DEFAULT 0,
   PRIMARY KEY (garage_id, day)
 );
+
+-- Restaure le 1er message pour les anciennes demandes (historique en base)
+INSERT INTO quote_messages (request_id, sender, body, photo)
+SELECT q.id, 'client', q.description, q.photo
+FROM quote_requests q
+WHERE NOT EXISTS (
+  SELECT 1 FROM quote_messages m WHERE m.request_id = q.id
+);
 `;
 
 async function migrate() {

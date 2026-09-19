@@ -53,6 +53,10 @@ API : `http://localhost:4000`
 Compte démo garage : `garage@mekano.app` / `garage123`  
 (autres démos : `garage2@mekano.app` … `garage4@mekano.app` — même mot de passe)
 
+> **Persistance** : photos, devis et messages vivent dans **PostgreSQL** (volume Docker `mekano_pg`).  
+> `db:seed` **ne les efface plus** — il crée / met à jour les comptes démo sans supprimer les garages existants.  
+> À éviter : `docker compose down -v` (le `-v` détruit le volume et donc toute la base).
+
 ### Validation admin (comptes & garages)
 
 À chaque inscription ou publication de garage, un email part vers `ADMIN_EMAIL`

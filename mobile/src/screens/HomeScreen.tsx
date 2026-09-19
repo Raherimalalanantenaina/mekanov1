@@ -31,7 +31,14 @@ import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 
-const QUICK_FILTERS = ['vidange', 'freins', 'pneus', 'diagnostic', 'moteur'];
+const QUICK_FILTERS = [
+  'vidange',
+  'freins',
+  'pneus',
+  'diagnostic',
+  'moteur',
+  'lavage',
+];
 type SortMode = 'distance' | 'rating';
 
 export function HomeScreen() {

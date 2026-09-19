@@ -1,10 +1,20 @@
 /**
- * Style de carte : OpenFreeMap « Liberty » — tuiles vectorielles gratuites,
- * sans clé d'API ni inscription, rendu moderne (données OpenStreetMap).
- * Les tuiles consultées sont mises en cache automatiquement par MapLibre
- * et restent visibles hors ligne.
+ * Styles Mekano — tuiles OpenFreeMap (OSM), branding teal.
+ * JSON embarqué = la carte s'affiche même hors ligne (tuiles déjà
+ * consultées restent en cache MapLibre).
  */
-export const OSM_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+import mekanoDark from './mekano-dark.json';
+import mekanoLight from './mekano-light.json';
+
+export const MAP_STYLE_LIGHT = mekanoLight;
+export const MAP_STYLE_DARK = mekanoDark;
+
+/** @deprecated utiliser mapStyleFor(mode) — conservé pour compat. */
+export const OSM_STYLE = mekanoLight;
+
+export function mapStyleFor(mode: 'light' | 'dark') {
+  return mode === 'dark' ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;
+}
 
 /** Équivalent zoom MapLibre d'un `latitudeDelta` de react-native-maps. */
 export function zoomForDelta(delta: number): number {

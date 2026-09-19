@@ -51,16 +51,37 @@ export function GarageInboxScreen() {
       setQuotes(q);
       setAppts(a);
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      // Ne vide pas l'historique déjà affiché ; alerte seulement si liste vide
+      setQuotes((prev) => {
+        if (prev.length === 0) {
+          Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+        }
+        return prev;
+      });
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, t]);
 
   useFocusEffect(
     useCallback(() => {
       reload();
     }, [reload])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!openQuote) return;
+      let cancelled = false;
+      fetchQuoteMessages(openQuote.id)
+        .then((m) => {
+          if (!cancelled) setMessages(m);
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }, [openQuote])
   );
 
   if (!user) {
@@ -73,7 +94,11 @@ export function GarageInboxScreen() {
 
   const openChat = async (q: Quote) => {
     setOpenQuote(q);
-    setMessages(await fetchQuoteMessages(q.id));
+    try {
+      setMessages(await fetchQuoteMessages(q.id));
+    } catch {
+      setMessages([]);
+    }
   };
 
   const send = async (body: string, photo: string) => {
