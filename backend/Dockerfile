@@ -4,7 +4,7 @@ COPY package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npm run build:api
 
 # Site web super admin (Vite + React), servi par l'API sur /admin
 FROM node:20-alpine AS admin
