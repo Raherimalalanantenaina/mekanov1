@@ -6,6 +6,7 @@ import { query } from '../db/pool';
 import { config } from '../config';
 import { sendAdminValidationEmail } from '../mailer';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
+import { getConfig } from '../appSettings';
 
 type UserRow = {
   id: string;
@@ -13,7 +14,7 @@ type UserRow = {
   password_hash: string;
   full_name: string;
   role: 'garage';
-  status: 'pending' | 'approved';
+  status: 'pending' | 'approved' | 'suspended';
 };
 
 const router = Router();
@@ -30,27 +31,35 @@ router.post('/register', async (req, res) => {
   }
 
   const hash = await bcrypt.hash(password, 10);
-  const approvalToken = crypto.randomUUID();
+  const needsApproval = (await getConfig()).config.approval.accounts;
+  const approvalToken = needsApproval ? crypto.randomUUID() : null;
 
   try {
     const { rows } = await query<UserRow>(
       `INSERT INTO users (email, password_hash, full_name, role, status, approval_token)
-       VALUES ($1, $2, $3, 'garage', 'pending', $4)
+       VALUES ($1, $2, $3, 'garage', $4, $5)
        RETURNING id, email, full_name, role, status`,
-      [email.toLowerCase().trim(), hash, fullName.trim(), approvalToken]
+      [
+        email.toLowerCase().trim(),
+        hash,
+        fullName.trim(),
+        needsApproval ? 'pending' : 'approved',
+        approvalToken,
+      ]
     );
     const user = rows[0];
 
-    await sendAdminValidationEmail({
-      subject: 'Nouveau compte garage à valider',
-      intro: 'Un nouveau compte garage vient d’être créé sur Mekano et attend ta validation.',
-      details: {
-        Nom: user.full_name,
-        Email: user.email,
-      },
-      approveUrl: `${config.publicUrl}/api/admin/users/${approvalToken}/approve`,
-      rejectUrl: `${config.publicUrl}/api/admin/users/${approvalToken}/reject`,
-    });
+    if (approvalToken)
+      await sendAdminValidationEmail({
+        subject: 'Nouveau compte garage à valider',
+        intro: 'Un nouveau compte garage vient d’être créé sur Mekano et attend ta validation.',
+        details: {
+          Nom: user.full_name,
+          Email: user.email,
+        },
+        approveUrl: `${config.publicUrl}/api/admin/users/${approvalToken}/approve`,
+        rejectUrl: `${config.publicUrl}/api/admin/users/${approvalToken}/reject`,
+      });
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
@@ -95,6 +104,11 @@ router.post('/login', async (req, res) => {
   const user = rows[0];
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     return res.status(401).json({ error: 'Identifiants invalides' });
+  }
+  if (user.status === 'suspended') {
+    return res
+      .status(403)
+      .json({ error: 'Compte suspendu par l’administrateur' });
   }
 
   const token = jwt.sign(

@@ -1,4 +1,5 @@
 import { pool } from './pool';
+import { loadCatalog, resolveCategories, seedCatalogIfEmpty } from '../serviceCatalog';
 
 const SQL = `
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -117,6 +118,37 @@ CREATE TABLE IF NOT EXISTS garage_stats_daily (
   PRIMARY KEY (garage_id, day)
 );
 
+-- Types de service (ids de service_categories) ; services = sous-types
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS categories TEXT[] NOT NULL DEFAULT '{}';
+CREATE INDEX IF NOT EXISTS idx_garages_categories ON garages USING GIN (categories);
+
+-- Catalogue des types de service, géré depuis le site super admin
+CREATE TABLE IF NOT EXISTS service_categories (
+  id TEXT PRIMARY KEY,
+  emoji TEXT NOT NULL DEFAULT '',
+  label_fr TEXT NOT NULL,
+  label_mg TEXT NOT NULL DEFAULT '',
+  keywords TEXT[] NOT NULL DEFAULT '{}',
+  position INT NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT true
+);
+CREATE TABLE IF NOT EXISTS service_subtypes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  category_id TEXT NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  label_fr TEXT NOT NULL,
+  label_mg TEXT NOT NULL DEFAULT '',
+  position INT NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT true
+);
+CREATE INDEX IF NOT EXISTS idx_subtypes_category ON service_subtypes (category_id);
+
+-- Configuration de l'app (clé 'app' = JSON de config, clé 'logo' = data URL)
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Restaure le 1er message pour les anciennes demandes (historique en base)
 INSERT INTO quote_messages (request_id, sender, body, photo)
 SELECT q.id, 'client', q.description, q.photo
@@ -128,6 +160,23 @@ WHERE NOT EXISTS (
 
 async function migrate() {
   await pool.query(SQL);
+
+  await seedCatalogIfEmpty();
+  await loadCatalog();
+  // Classe les garages existants à partir de leurs anciens services
+  const { rows } = await pool.query<{ id: string; services: string[] }>(
+    `SELECT id, services FROM garages WHERE categories = '{}'`
+  );
+  for (const row of rows) {
+    const categories = resolveCategories([], row.services);
+    if (categories.length) {
+      await pool.query(`UPDATE garages SET categories = $2 WHERE id = $1`, [
+        row.id,
+        categories,
+      ]);
+    }
+  }
+
   console.log('Migration OK');
   await pool.end();
 }

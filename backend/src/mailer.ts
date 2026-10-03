@@ -47,6 +47,7 @@ export async function sendAdminValidationEmail(opts: {
           ❌ Refuser
         </a>
       </p>
+      <p><a href="${config.publicUrl}/admin/" style="color:#0f766e;">Ouvrir le site super admin</a></p>
       <p style="color:#999;font-size:12px;">Email automatique envoyé par l'API Mekano.</p>
     </div>`;
 

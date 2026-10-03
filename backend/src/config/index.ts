@@ -21,4 +21,9 @@ export const config = {
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
   },
+  /** Identifiants du site super admin (/admin). Vides = connexion désactivée. */
+  superAdmin: {
+    email: (process.env.SUPERADMIN_EMAIL || '').toLowerCase().trim(),
+    password: process.env.SUPERADMIN_PASSWORD || '',
+  },
 };

@@ -10,11 +10,10 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { useTheme } from '../context/ThemeContext';
 
 /** Marqueur "ma position" avec halo animé discret. */
 export function UserLocationMarker() {
-  const { colors } = useTheme();
+  const { colors, gradients } = useTheme();
   const pulse = useSharedValue(0);
 
   useEffect(() => {

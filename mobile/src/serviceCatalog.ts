@@ -1,107 +1,82 @@
 /**
  * Catalogue des types de service (catégories) et de leurs sous-types.
- * Doit rester identique à mobile/src/serviceCatalog.ts.
+ * Géré depuis le site super admin et chargé via /api/config (voir appConfig.tsx) ;
+ * DEFAULT_CATALOG sert tant que la config n'est pas encore reçue.
  *
  * - `categories` d'un garage : liste d'ids (ex. 'vulca')
  * - `services` d'un garage : libellés des sous-types (ex. 'Réparation pneu')
  * - `keywords` : mots reconnus en recherche et pour classer les anciens services
  */
+import type { Lang } from './i18n';
+
+export type ServiceSubtype = {
+  id: string;
+  label: string;
+  labelMg: string;
+};
+
 export type ServiceCategory = {
   id: string;
   emoji: string;
   label: string;
-  subtypes: string[];
+  labelMg: string;
   keywords: string[];
+  subtypes: ServiceSubtype[];
 };
 
-export const SERVICE_CATEGORIES: ServiceCategory[] = [
-  {
-    id: 'mecanique',
-    emoji: '🔧',
-    label: 'Garage mécanique',
-    subtypes: ['Vidange', 'Moteur', 'Embrayage', 'Freinage'],
-    keywords: ['mecanique', 'mecanicien', 'entretien', 'vidange', 'frein', 'moteur', 'embrayage', 'boite', 'suspension', 'echappement', '4x4', 'revision'],
-  },
-  {
-    id: 'vulca',
-    emoji: '🛞',
-    label: 'Vulca',
-    subtypes: ['Crevaison', 'Réparation pneu', 'Montage pneu'],
-    keywords: ['vulca', 'vulcanisation', 'pneu', 'crevaison', 'jante', 'roue'],
-  },
-  {
-    id: 'electricien',
-    emoji: '⚡',
-    label: 'Électricien automobile',
-    subtypes: ['Batterie', 'Alternateur', 'Démarreur', 'Câblage'],
-    keywords: ['electricien', 'electricite', 'electrique', 'batterie', 'alternateur', 'demarreur', 'cablage'],
-  },
-  {
-    id: 'carrossier',
-    emoji: '🚗',
-    label: 'Carrossier',
-    subtypes: ['Accident', 'Tôlerie', 'Peinture'],
-    keywords: ['carrosserie', 'carrossier', 'accident', 'tolerie', 'peinture', 'bosse'],
-  },
-  {
-    id: 'climatisation',
-    emoji: '❄️',
-    label: 'Climatisation auto',
-    subtypes: ['Recharge clim', 'Réparation clim'],
-    keywords: ['clim', 'climatisation'],
-  },
-  {
-    id: 'moto',
-    emoji: '🏍️',
-    label: 'Garage moto',
-    subtypes: ['Entretien moto', 'Réparation moto'],
-    keywords: ['moto', 'scooter', 'deux roues'],
-  },
-  {
-    id: 'lavage',
-    emoji: '🚿',
-    label: 'Lavage automobile',
-    subtypes: ['Lavage', 'Nettoyage intérieur'],
-    keywords: ['lavage', 'nettoyage', 'laver'],
-  },
-  {
-    id: 'diagnostic',
-    emoji: '🚘',
-    label: 'Diagnostic automobile',
-    subtypes: ['Scanner OBD', 'Diagnostic électronique'],
-    keywords: ['diagnostic', 'obd', 'scanner', 'valise'],
-  },
-  {
-    id: 'vitrage',
-    emoji: '🪟',
-    label: 'Pare-brise / vitrage',
-    subtypes: ['Remplacement vitrage', 'Réparation vitrage'],
-    keywords: ['pare brise', 'vitrage', 'vitre', 'retroviseur'],
-  },
-  {
-    id: 'serrurier',
-    emoji: '🔑',
-    label: 'Serrurier automobile',
-    subtypes: ['Clés', 'Télécommande', 'Ouverture'],
-    keywords: ['serrurier', 'serrurerie', 'cle', 'telecommande', 'ouverture', 'antidemarrage'],
-  },
-  {
-    id: 'pieces',
-    emoji: '🧰',
-    label: 'Pièces détachées',
-    subtypes: ['Pièces auto', 'Pièces moto'],
-    keywords: ['piece', 'pieces detachees', 'accessoire'],
-  },
-  {
-    id: 'depannage',
-    emoji: '🆘',
-    label: 'Dépannage / remorquage',
-    subtypes: ['Intervention sur route', 'Remorquage'],
-    keywords: ['depannage', 'depanneuse', 'remorquage', 'remorque', 'sos', 'panne'],
-  },
+const cat = (
+  id: string,
+  emoji: string,
+  label: string,
+  subtypes: string[],
+  keywords: string[]
+): ServiceCategory => ({
+  id,
+  emoji,
+  label,
+  labelMg: '',
+  keywords,
+  subtypes: subtypes.map((s) => ({ id: s, label: s, labelMg: '' })),
+});
+
+export const DEFAULT_CATALOG: ServiceCategory[] = [
+  cat('mecanique', '🔧', 'Garage mécanique', ['Vidange', 'Moteur', 'Embrayage', 'Freinage'], ['mecanique', 'mecanicien', 'entretien', 'vidange', 'frein', 'moteur', 'embrayage', 'boite', 'suspension', 'echappement', '4x4', 'revision']),
+  cat('vulca', '🛞', 'Vulca', ['Crevaison', 'Réparation pneu', 'Montage pneu'], ['vulca', 'vulcanisation', 'pneu', 'crevaison', 'jante', 'roue']),
+  cat('electricien', '⚡', 'Électricien automobile', ['Batterie', 'Alternateur', 'Démarreur', 'Câblage'], ['electricien', 'electricite', 'electrique', 'batterie', 'alternateur', 'demarreur', 'cablage']),
+  cat('carrossier', '🚗', 'Carrossier', ['Accident', 'Tôlerie', 'Peinture'], ['carrosserie', 'carrossier', 'accident', 'tolerie', 'peinture', 'bosse']),
+  cat('climatisation', '❄️', 'Climatisation auto', ['Recharge clim', 'Réparation clim'], ['clim', 'climatisation']),
+  cat('moto', '🏍️', 'Garage moto', ['Entretien moto', 'Réparation moto'], ['moto', 'scooter', 'deux roues']),
+  cat('lavage', '🚿', 'Lavage automobile', ['Lavage', 'Nettoyage intérieur'], ['lavage', 'nettoyage', 'laver']),
+  cat('diagnostic', '🚘', 'Diagnostic automobile', ['Scanner OBD', 'Diagnostic électronique'], ['diagnostic', 'obd', 'scanner', 'valise']),
+  cat('vitrage', '🪟', 'Pare-brise / vitrage', ['Remplacement vitrage', 'Réparation vitrage'], ['pare brise', 'vitrage', 'vitre', 'retroviseur']),
+  cat('serrurier', '🔑', 'Serrurier automobile', ['Clés', 'Télécommande', 'Ouverture'], ['serrurier', 'serrurerie', 'cle', 'telecommande', 'ouverture', 'antidemarrage']),
+  cat('pieces', '🧰', 'Pièces détachées', ['Pièces auto', 'Pièces moto'], ['piece', 'pieces detachees', 'accessoire']),
+  cat('depannage', '🆘', 'Dépannage / remorquage', ['Intervention sur route', 'Remorquage'], ['depannage', 'depanneuse', 'remorquage', 'remorque', 'sos', 'panne']),
 ];
 
-const CATEGORY_IDS = new Set(SERVICE_CATEGORIES.map((c) => c.id));
+let catalog: ServiceCategory[] = DEFAULT_CATALOG;
+
+export function setCatalog(next: ServiceCategory[]) {
+  if (Array.isArray(next) && next.length > 0) catalog = next;
+}
+
+export function getCatalog(): ServiceCategory[] {
+  return catalog;
+}
+
+export function getCategory(id: string): ServiceCategory | undefined {
+  return catalog.find((c) => c.id === id);
+}
+
+/** Libellé dans la langue choisie (repli sur le français). */
+export function localized(item: { label: string; labelMg?: string }, lang: Lang): string {
+  return (lang === 'mg' && item.labelMg) || item.label;
+}
+
+export function categoryLabel(id: string, lang: Lang = 'fr'): string {
+  const c = getCategory(id);
+  return c ? `${c.emoji} ${localized(c, lang)}` : id;
+}
 
 /** Minuscules, sans accents, ponctuation → espaces. */
 export function normalize(text: string): string {
@@ -122,51 +97,82 @@ function startsWord(haystack: string, needle: string): boolean {
 function categoryOfService(service: string): string | null {
   const s = normalize(service);
   if (!s) return null;
-  const exact = SERVICE_CATEGORIES.find((c) =>
-    c.subtypes.some((sub) => normalize(sub) === s)
+  const exact = catalog.find((c) =>
+    c.subtypes.some((sub) => normalize(sub.label) === s)
   );
   if (exact) return exact.id;
-  const byKeyword = SERVICE_CATEGORIES.find((c) =>
+  const byKeyword = catalog.find((c) =>
     c.keywords.some((kw) => startsWord(s, normalize(kw)))
   );
   return byKeyword?.id ?? null;
 }
 
-/** Ids de catégories valides = choix explicites + catégories déduites des services. */
-export function resolveCategories(
-  explicit: unknown,
-  services: unknown
-): string[] {
+/** Catégories déduites des services (garages créés avant les types). */
+export function resolveCategories(services: string[]): string[] {
   const ids = new Set<string>();
-  if (Array.isArray(explicit)) {
-    for (const id of explicit) {
-      if (typeof id === 'string' && CATEGORY_IDS.has(id)) ids.add(id);
-    }
+  for (const s of services) {
+    const id = categoryOfService(s);
+    if (id) ids.add(id);
   }
-  if (Array.isArray(services)) {
-    for (const s of services) {
-      if (typeof s !== 'string') continue;
-      const id = categoryOfService(s);
-      if (id) ids.add(id);
-    }
-  }
-  return SERVICE_CATEGORIES.filter((c) => ids.has(c.id)).map((c) => c.id);
+  return catalog.filter((c) => ids.has(c.id)).map((c) => c.id);
 }
 
 /** Catégories correspondant à un texte de recherche (libellé, sous-type ou mot-clé). */
 export function matchingCategoryIds(term: string): string[] {
   const t = normalize(term);
   if (t.length < 2) return [];
-  return SERVICE_CATEGORIES.filter((c) => {
-    const names = [c.label, ...c.subtypes, ...c.keywords].map(normalize);
-    return (
-      names.some((n) => startsWord(n, t)) ||
-      c.keywords.some((kw) => startsWord(t, normalize(kw)))
-    );
-  }).map((c) => c.id);
+  return catalog
+    .filter((c) => {
+      const names = [
+        c.label,
+        c.labelMg,
+        ...c.subtypes.flatMap((s) => [s.label, s.labelMg]),
+        ...c.keywords,
+      ]
+        .filter(Boolean)
+        .map(normalize);
+      return (
+        names.some((n) => startsWord(n, t)) ||
+        c.keywords.some((kw) => startsWord(t, normalize(kw)))
+      );
+    })
+    .map((c) => c.id);
 }
 
-export function categoryLabel(id: string): string {
-  const c = SERVICE_CATEGORIES.find((x) => x.id === id);
-  return c ? `${c.emoji} ${c.label}` : id;
+type GarageLike = {
+  name: string;
+  city: string;
+  address?: string;
+  categories?: string[];
+  services: string[];
+};
+
+/** Types connus d'un garage (repli sur les services pour les anciennes fiches). */
+export function garageCategoryIds(g: GarageLike): string[] {
+  const known = new Set(catalog.map((c) => c.id));
+  const ids = (g.categories ?? []).filter((id) => known.has(id));
+  return ids.length ? ids : resolveCategories(g.services);
+}
+
+/** Filtre local (cache hors ligne, carte) équivalent à la recherche du serveur. */
+export function garageMatches(
+  g: GarageLike,
+  params: { q?: string; category?: string; service?: string }
+): boolean {
+  const ids = garageCategoryIds(g);
+  if (params.category && !ids.includes(params.category)) return false;
+  if (params.service) {
+    const s = params.service.toLowerCase();
+    if (!g.services.some((x) => x.toLowerCase() === s)) return false;
+  }
+  const q = params.q?.trim().toLowerCase();
+  if (!q) return true;
+  const matched = matchingCategoryIds(q);
+  return (
+    g.name.toLowerCase().includes(q) ||
+    g.city.toLowerCase().includes(q) ||
+    (g.address ?? '').toLowerCase().includes(q) ||
+    g.services.some((s) => s.toLowerCase().includes(q)) ||
+    ids.some((id) => matched.includes(id))
+  );
 }

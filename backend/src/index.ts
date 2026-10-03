@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 import { config } from './config';
 import authRoutes from './routes/auth';
 import garageRoutes from './routes/garages';
@@ -7,6 +9,9 @@ import quoteRoutes from './routes/quotes';
 import appointmentRoutes from './routes/appointments';
 import adminRoutes from './routes/admin';
 import pushRoutes from './routes/push';
+import configRoutes from './routes/config';
+import superAdminRoutes from './routes/superadmin';
+import { loadCatalog } from './serviceCatalog';
 
 const app = express();
 
@@ -27,6 +32,15 @@ app.use('/api/quotes', quoteRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/config', configRoutes);
+app.use('/api/superadmin', superAdminRoutes);
+
+// Site web super admin (build Vite de backend/admin)
+const adminDir = path.join(__dirname, '../admin/dist');
+if (fs.existsSync(adminDir)) {
+  app.use('/admin', express.static(adminDir, { index: 'index.html' }));
+  app.get('/admin/*', (_req, res) => res.sendFile(path.join(adminDir, 'index.html')));
+}
 
 app.use(
   (
@@ -40,6 +54,10 @@ app.use(
   }
 );
 
-app.listen(config.port, () => {
-  console.log(`Mekano API sur http://localhost:${config.port}`);
-});
+loadCatalog()
+  .catch((err) => console.error('Chargement du catalogue échoué :', err))
+  .finally(() => {
+    app.listen(config.port, () => {
+      console.log(`Mekano API sur http://localhost:${config.port}`);
+    });
+  });

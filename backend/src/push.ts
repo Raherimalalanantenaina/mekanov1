@@ -83,3 +83,25 @@ export async function pushToUser(userId: string, msg: PushMessage) {
   );
   await sendToTokens(rows.map((r) => r.token), msg);
 }
+
+/**
+ * Notification à tous les appareils d'une audience (super admin).
+ * Expo limite chaque requête à 100 messages : envoi par lots.
+ */
+export async function pushBroadcast(
+  audience: 'all' | 'clients' | 'garages',
+  msg: PushMessage
+): Promise<number> {
+  const where =
+    audience === 'clients'
+      ? 'WHERE user_id IS NULL'
+      : audience === 'garages'
+        ? 'WHERE user_id IS NOT NULL'
+        : '';
+  const { rows } = await query<{ token: string }>(`SELECT token FROM push_tokens ${where}`);
+  const tokens = rows.map((r) => r.token);
+  for (let i = 0; i < tokens.length; i += 100) {
+    await sendToTokens(tokens.slice(i, i + 100), msg);
+  }
+  return tokens.length;
+}
