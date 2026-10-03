@@ -2,8 +2,10 @@ import { api, readFileAsDataUrl } from '../api';
 import { useCatalog } from '../App';
 import { useI18n, type TKey } from '../i18n';
 import { FEATURES, type AppConfig, type LocalizedText } from '../types';
-import { Check, Field } from '../ui';
+import { Check, Field, Loader, PageHead } from '../ui';
 import { useAppConfig } from '../useAppConfig';
+import { mdiCogOutline, mdiContentSave, mdiMagnify } from '@mdi/js';
+import { CategoryIcon, MdiIcon } from '../CategoryIcon';
 
 type TextKey = keyof AppConfig['texts'];
 const TEXT_KEYS: TextKey[] = ['heroTitle1', 'heroTitle2', 'searchPlaceholder'];
@@ -19,7 +21,7 @@ export function Config() {
   const { catalog } = useCatalog();
   const { config, setConfig, logoUrl, setLogoUrl, save, busy, run } = useAppConfig();
 
-  if (!config) return <div className="empty">{t('loading')}</div>;
+  if (!config) return <Loader />;
 
   const update = (patch: Partial<AppConfig>) => setConfig({ ...config, ...patch });
   const setText = (key: TextKey, l: 'fr' | 'mg', value: string) =>
@@ -39,12 +41,11 @@ export function Config() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>{t('navConfig')}</h1>
+      <PageHead title={t('navConfig')} icon={mdiCogOutline}>
         <button className="btn btn-primary" disabled={busy} onClick={() => save(config)}>
-          {t('save')}
+          <MdiIcon path={mdiContentSave} size={17} /> {t('save')}
         </button>
-      </div>
+      </PageHead>
 
       <div className="config-layout">
         <div>
@@ -193,7 +194,9 @@ export function Config() {
               <div className="phone-title">
                 {text('heroTitle1')} <span style={{ color: accent }}>{text('heroTitle2')}</span>
               </div>
-              <div className="phone-search">🔍 {text('searchPlaceholder')}</div>
+              <div className="phone-search cat-inline">
+                <MdiIcon path={mdiMagnify} size={13} /> {text('searchPlaceholder')}
+              </div>
             </div>
             <div className="phone-chips">
               {catalog
@@ -202,10 +205,11 @@ export function Config() {
                 .map((c, i) => (
                   <span
                     key={c.id}
-                    className="phone-chip"
+                    className="phone-chip cat-inline"
                     style={i === 0 ? { background: primary, color: '#fff', borderColor: primary } : undefined}
                   >
-                    {c.emoji} {(lang === 'mg' && c.labelMg) || c.label}
+                    <CategoryIcon name={c.icon} size={12} />
+                    {(lang === 'mg' && c.labelMg) || c.label}
                   </span>
                 ))}
             </div>

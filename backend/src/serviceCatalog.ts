@@ -7,9 +7,38 @@ export type ServiceSubtype = {
   active: boolean;
 };
 
+/** Icônes proposées dans le site admin (noms MaterialCommunityIcons, rendus dans l'app). */
+export const CATEGORY_ICONS = [
+  'wrench',
+  'car-wrench',
+  'tools',
+  'tire',
+  'car-battery',
+  'lightning-bolt',
+  'spray',
+  'car-door',
+  'snowflake',
+  'motorbike',
+  'car-wash',
+  'car-cog',
+  'car-windshield',
+  'key-variant',
+  'cog',
+  'tow-truck',
+  'oil',
+  'engine',
+  'car-brake-alert',
+  'garage',
+  'car',
+] as const;
+
+export function isCategoryIcon(v: unknown): v is string {
+  return typeof v === 'string' && (CATEGORY_ICONS as readonly string[]).includes(v);
+}
+
 export type ServiceCategory = {
   id: string;
-  emoji: string;
+  icon: string;
   label: string;
   labelMg: string;
   keywords: string[];
@@ -19,7 +48,7 @@ export type ServiceCategory = {
 
 type DefaultCategory = {
   id: string;
-  emoji: string;
+  icon: string;
   label: string;
   subtypes: string[];
   keywords: string[];
@@ -29,84 +58,84 @@ type DefaultCategory = {
 export const DEFAULT_CATALOG: DefaultCategory[] = [
   {
     id: 'mecanique',
-    emoji: '🔧',
+    icon: 'wrench',
     label: 'Garage mécanique',
     subtypes: ['Vidange', 'Moteur', 'Embrayage', 'Freinage'],
     keywords: ['mecanique', 'mecanicien', 'entretien', 'vidange', 'frein', 'moteur', 'embrayage', 'boite', 'suspension', 'echappement', '4x4', 'revision'],
   },
   {
     id: 'vulca',
-    emoji: '🛞',
+    icon: 'tire',
     label: 'Vulca',
     subtypes: ['Crevaison', 'Réparation pneu', 'Montage pneu'],
     keywords: ['vulca', 'vulcanisation', 'pneu', 'crevaison', 'jante', 'roue'],
   },
   {
     id: 'electricien',
-    emoji: '⚡',
+    icon: 'car-battery',
     label: 'Électricien automobile',
     subtypes: ['Batterie', 'Alternateur', 'Démarreur', 'Câblage'],
     keywords: ['electricien', 'electricite', 'electrique', 'batterie', 'alternateur', 'demarreur', 'cablage'],
   },
   {
     id: 'carrossier',
-    emoji: '🚗',
+    icon: 'spray',
     label: 'Carrossier',
     subtypes: ['Accident', 'Tôlerie', 'Peinture'],
     keywords: ['carrosserie', 'carrossier', 'accident', 'tolerie', 'peinture', 'bosse'],
   },
   {
     id: 'climatisation',
-    emoji: '❄️',
+    icon: 'snowflake',
     label: 'Climatisation auto',
     subtypes: ['Recharge clim', 'Réparation clim'],
     keywords: ['clim', 'climatisation'],
   },
   {
     id: 'moto',
-    emoji: '🏍️',
+    icon: 'motorbike',
     label: 'Garage moto',
     subtypes: ['Entretien moto', 'Réparation moto'],
     keywords: ['moto', 'scooter', 'deux roues'],
   },
   {
     id: 'lavage',
-    emoji: '🚿',
+    icon: 'car-wash',
     label: 'Lavage automobile',
     subtypes: ['Lavage', 'Nettoyage intérieur'],
     keywords: ['lavage', 'nettoyage', 'laver'],
   },
   {
     id: 'diagnostic',
-    emoji: '🚘',
+    icon: 'car-cog',
     label: 'Diagnostic automobile',
     subtypes: ['Scanner OBD', 'Diagnostic électronique'],
     keywords: ['diagnostic', 'obd', 'scanner', 'valise'],
   },
   {
     id: 'vitrage',
-    emoji: '🪟',
+    icon: 'car-windshield',
     label: 'Pare-brise / vitrage',
     subtypes: ['Remplacement vitrage', 'Réparation vitrage'],
     keywords: ['pare brise', 'vitrage', 'vitre', 'retroviseur'],
   },
   {
     id: 'serrurier',
-    emoji: '🔑',
+    icon: 'key-variant',
     label: 'Serrurier automobile',
     subtypes: ['Clés', 'Télécommande', 'Ouverture'],
     keywords: ['serrurier', 'serrurerie', 'cle', 'telecommande', 'ouverture', 'antidemarrage'],
   },
   {
     id: 'pieces',
-    emoji: '🧰',
+    icon: 'cog',
     label: 'Pièces détachées',
     subtypes: ['Pièces auto', 'Pièces moto'],
     keywords: ['piece', 'pieces detachees', 'accessoire'],
   },
   {
     id: 'depannage',
-    emoji: '🆘',
+    icon: 'tow-truck',
     label: 'Dépannage / remorquage',
     subtypes: ['Intervention sur route', 'Remorquage'],
     keywords: ['depannage', 'depanneuse', 'remorquage', 'remorque', 'sos', 'panne'],
@@ -115,7 +144,7 @@ export const DEFAULT_CATALOG: DefaultCategory[] = [
 
 let catalog: ServiceCategory[] = DEFAULT_CATALOG.map((c) => ({
   id: c.id,
-  emoji: c.emoji,
+  icon: c.icon,
   label: c.label,
   labelMg: '',
   keywords: c.keywords,
@@ -129,6 +158,11 @@ let catalog: ServiceCategory[] = DEFAULT_CATALOG.map((c) => ({
 }));
 let catalogVersion = 0;
 
+/** Icône par défaut des types de service fournis à l'installation. */
+export function defaultIconFor(id: string): string | null {
+  return DEFAULT_CATALOG.find((c) => c.id === id)?.icon ?? null;
+}
+
 /** Insère le catalogue par défaut si la table est vide. */
 export async function seedCatalogIfEmpty(): Promise<void> {
   const { rows } = await query<{ count: string }>(
@@ -137,9 +171,9 @@ export async function seedCatalogIfEmpty(): Promise<void> {
   if (Number(rows[0].count) > 0) return;
   for (const [i, c] of DEFAULT_CATALOG.entries()) {
     await query(
-      `INSERT INTO service_categories (id, emoji, label_fr, keywords, position)
+      `INSERT INTO service_categories (id, icon, label_fr, keywords, position)
        VALUES ($1,$2,$3,$4,$5)`,
-      [c.id, c.emoji, c.label, c.keywords, i]
+      [c.id, c.icon, c.label, c.keywords, i]
     );
     for (const [j, label] of c.subtypes.entries()) {
       await query(
@@ -155,13 +189,13 @@ export async function seedCatalogIfEmpty(): Promise<void> {
 export async function loadCatalog(): Promise<void> {
   const cats = await query<{
     id: string;
-    emoji: string;
+    icon: string;
     label_fr: string;
     label_mg: string | null;
     keywords: string[] | null;
     active: boolean;
   }>(
-    `SELECT id, emoji, label_fr, label_mg, keywords, active
+    `SELECT id, icon, label_fr, label_mg, keywords, active
      FROM service_categories ORDER BY position, label_fr`
   );
   const subs = await query<{
@@ -176,7 +210,7 @@ export async function loadCatalog(): Promise<void> {
   );
   catalog = cats.rows.map((c) => ({
     id: c.id,
-    emoji: c.emoji,
+    icon: isCategoryIcon(c.icon) ? c.icon : 'wrench',
     label: c.label_fr,
     labelMg: c.label_mg ?? '',
     keywords: c.keywords ?? [],
@@ -309,5 +343,5 @@ export function matchingCategoryIds(term: string): string[] {
 
 export function categoryLabel(id: string): string {
   const c = catalog.find((x) => x.id === id);
-  return c ? `${c.emoji} ${c.label}` : id;
+  return c ? c.label : id;
 }

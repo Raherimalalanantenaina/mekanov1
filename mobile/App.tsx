@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { I18nProvider } from './src/i18n';
 import { MekanoLogo } from './src/components/MekanoLogo';
+import { NotifierProvider } from './src/components/Notifier';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { registerForPush } from './src/push';
 
@@ -45,7 +46,9 @@ export default function App() {
         <ThemeProvider>
           <I18nProvider>
             <AuthProvider>
-              <Boot />
+              <NotifierProvider>
+                <Boot />
+              </NotifierProvider>
             </AuthProvider>
           </I18nProvider>
         </ThemeProvider>

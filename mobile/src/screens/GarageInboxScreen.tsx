@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -24,6 +23,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Appointment, Quote, QuoteMessage } from '../types';
+import { notify } from '../components/Notifier';
 
 type Tab = 'quotes' | 'bookings';
 
@@ -54,7 +54,7 @@ export function GarageInboxScreen() {
       // Ne vide pas l'historique déjà affiché ; alerte seulement si liste vide
       setQuotes((prev) => {
         if (prev.length === 0) {
-          Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+          notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
         }
         return prev;
       });

@@ -1,27 +1,25 @@
 import { useI18n, type TKey } from '../i18n';
 import { FORM_FIELDS } from '../types';
-import { Check, Field } from '../ui';
+import { Check, Field, Loader, PageHead } from '../ui';
+import { mdiContentSave, mdiFormSelect } from '@mdi/js';
+import { MdiIcon } from '../CategoryIcon';
 import { useAppConfig } from '../useAppConfig';
 
 export function GarageForm() {
   const { t } = useI18n();
   const { config, setConfig, save, busy } = useAppConfig();
 
-  if (!config) return <div className="empty">{t('loading')}</div>;
+  if (!config) return <Loader />;
   const form = config.garageForm;
   const setForm = (patch: Partial<typeof form>) => setConfig({ ...config, garageForm: { ...form, ...patch } });
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>{t('navGarageForm')}</h1>
-          <p className="hint">{t('formHint')}</p>
-        </div>
+      <PageHead title={t('navGarageForm')} hint={t('formHint')} icon={mdiFormSelect}>
         <button className="btn btn-primary" disabled={busy} onClick={() => save(config)}>
-          {t('save')}
+          <MdiIcon path={mdiContentSave} size={17} /> {t('save')}
         </button>
-      </div>
+      </PageHead>
 
       <div className="card">
         <div className="grid grid-2">
@@ -44,7 +42,7 @@ export function GarageForm() {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0 }}>
+      <div className="card card-flush">
         <table>
           <thead>
             <tr>

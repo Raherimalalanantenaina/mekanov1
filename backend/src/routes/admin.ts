@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { query } from '../db/pool';
+import { approveOwnerOf } from './garages';
 
 const router = Router();
 
@@ -9,7 +10,7 @@ function page(title: string, message: string, ok: boolean) {
 <title>Mekano — ${title}</title></head>
 <body style="font-family:Arial,sans-serif;background:#f4f6f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
   <div style="background:#fff;border-radius:16px;padding:40px;max-width:420px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.08);">
-    <div style="font-size:52px;">${ok ? '✅' : '❌'}</div>
+    <div><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="${ok ? '#0f766e' : '#dc2626'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ok ? '<circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/>' : '<circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/>'}</svg></div>
     <h1 style="color:#0f766e;font-size:22px;">${title}</h1>
     <p style="color:#555;line-height:1.5;">${message}</p>
   </div>
@@ -81,6 +82,7 @@ router.get('/garages/:token/:action', async (req, res) => {
       `UPDATE garages SET status = 'approved', approval_token = NULL WHERE id = $1`,
       [garage.id]
     );
+    await approveOwnerOf(garage.id);
     return res.send(
       page(
         'Garage validé',
@@ -90,11 +92,20 @@ router.get('/garages/:token/:action', async (req, res) => {
     );
   }
 
-  await query(`DELETE FROM garages WHERE id = $1`, [garage.id]);
+  // Inscription refusée : on supprime aussi le compte s'il n'a jamais été validé
+  const owner = await query<{ owner_id: string }>(
+    `DELETE FROM garages WHERE id = $1 RETURNING owner_id`,
+    [garage.id]
+  );
+  const removed = owner.rows[0]
+    ? await query(`DELETE FROM users WHERE id = $1 AND status = 'pending'`, [owner.rows[0].owner_id])
+    : { rowCount: 0 };
   return res.send(
     page(
       'Garage refusé',
-      `Le garage <strong>${garage.name}</strong> a été refusé et supprimé.`,
+      `Le garage <strong>${garage.name}</strong> a été refusé et supprimé${
+        removed.rowCount ? ', ainsi que le compte en attente du garagiste' : ''
+      }.`,
       true
     )
   );

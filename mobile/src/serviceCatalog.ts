@@ -17,7 +17,8 @@ export type ServiceSubtype = {
 
 export type ServiceCategory = {
   id: string;
-  emoji: string;
+  /** Nom d'icône MaterialCommunityIcons choisi dans le site admin */
+  icon?: string;
   label: string;
   labelMg: string;
   keywords: string[];
@@ -26,13 +27,13 @@ export type ServiceCategory = {
 
 const cat = (
   id: string,
-  emoji: string,
+  icon: string,
   label: string,
   subtypes: string[],
   keywords: string[]
 ): ServiceCategory => ({
   id,
-  emoji,
+  icon,
   label,
   labelMg: '',
   keywords,
@@ -40,18 +41,18 @@ const cat = (
 });
 
 export const DEFAULT_CATALOG: ServiceCategory[] = [
-  cat('mecanique', '🔧', 'Garage mécanique', ['Vidange', 'Moteur', 'Embrayage', 'Freinage'], ['mecanique', 'mecanicien', 'entretien', 'vidange', 'frein', 'moteur', 'embrayage', 'boite', 'suspension', 'echappement', '4x4', 'revision']),
-  cat('vulca', '🛞', 'Vulca', ['Crevaison', 'Réparation pneu', 'Montage pneu'], ['vulca', 'vulcanisation', 'pneu', 'crevaison', 'jante', 'roue']),
-  cat('electricien', '⚡', 'Électricien automobile', ['Batterie', 'Alternateur', 'Démarreur', 'Câblage'], ['electricien', 'electricite', 'electrique', 'batterie', 'alternateur', 'demarreur', 'cablage']),
-  cat('carrossier', '🚗', 'Carrossier', ['Accident', 'Tôlerie', 'Peinture'], ['carrosserie', 'carrossier', 'accident', 'tolerie', 'peinture', 'bosse']),
-  cat('climatisation', '❄️', 'Climatisation auto', ['Recharge clim', 'Réparation clim'], ['clim', 'climatisation']),
-  cat('moto', '🏍️', 'Garage moto', ['Entretien moto', 'Réparation moto'], ['moto', 'scooter', 'deux roues']),
-  cat('lavage', '🚿', 'Lavage automobile', ['Lavage', 'Nettoyage intérieur'], ['lavage', 'nettoyage', 'laver']),
-  cat('diagnostic', '🚘', 'Diagnostic automobile', ['Scanner OBD', 'Diagnostic électronique'], ['diagnostic', 'obd', 'scanner', 'valise']),
-  cat('vitrage', '🪟', 'Pare-brise / vitrage', ['Remplacement vitrage', 'Réparation vitrage'], ['pare brise', 'vitrage', 'vitre', 'retroviseur']),
-  cat('serrurier', '🔑', 'Serrurier automobile', ['Clés', 'Télécommande', 'Ouverture'], ['serrurier', 'serrurerie', 'cle', 'telecommande', 'ouverture', 'antidemarrage']),
-  cat('pieces', '🧰', 'Pièces détachées', ['Pièces auto', 'Pièces moto'], ['piece', 'pieces detachees', 'accessoire']),
-  cat('depannage', '🆘', 'Dépannage / remorquage', ['Intervention sur route', 'Remorquage'], ['depannage', 'depanneuse', 'remorquage', 'remorque', 'sos', 'panne']),
+  cat('mecanique', 'wrench', 'Garage mécanique', ['Vidange', 'Moteur', 'Embrayage', 'Freinage'], ['mecanique', 'mecanicien', 'entretien', 'vidange', 'frein', 'moteur', 'embrayage', 'boite', 'suspension', 'echappement', '4x4', 'revision']),
+  cat('vulca', 'tire', 'Vulca', ['Crevaison', 'Réparation pneu', 'Montage pneu'], ['vulca', 'vulcanisation', 'pneu', 'crevaison', 'jante', 'roue']),
+  cat('electricien', 'car-battery', 'Électricien automobile', ['Batterie', 'Alternateur', 'Démarreur', 'Câblage'], ['electricien', 'electricite', 'electrique', 'batterie', 'alternateur', 'demarreur', 'cablage']),
+  cat('carrossier', 'spray', 'Carrossier', ['Accident', 'Tôlerie', 'Peinture'], ['carrosserie', 'carrossier', 'accident', 'tolerie', 'peinture', 'bosse']),
+  cat('climatisation', 'snowflake', 'Climatisation auto', ['Recharge clim', 'Réparation clim'], ['clim', 'climatisation']),
+  cat('moto', 'motorbike', 'Garage moto', ['Entretien moto', 'Réparation moto'], ['moto', 'scooter', 'deux roues']),
+  cat('lavage', 'car-wash', 'Lavage automobile', ['Lavage', 'Nettoyage intérieur'], ['lavage', 'nettoyage', 'laver']),
+  cat('diagnostic', 'car-cog', 'Diagnostic automobile', ['Scanner OBD', 'Diagnostic électronique'], ['diagnostic', 'obd', 'scanner', 'valise']),
+  cat('vitrage', 'car-windshield', 'Pare-brise / vitrage', ['Remplacement vitrage', 'Réparation vitrage'], ['pare brise', 'vitrage', 'vitre', 'retroviseur']),
+  cat('serrurier', 'key-variant', 'Serrurier automobile', ['Clés', 'Télécommande', 'Ouverture'], ['serrurier', 'serrurerie', 'cle', 'telecommande', 'ouverture', 'antidemarrage']),
+  cat('pieces', 'cog', 'Pièces détachées', ['Pièces auto', 'Pièces moto'], ['piece', 'pieces detachees', 'accessoire']),
+  cat('depannage', 'tow-truck', 'Dépannage / remorquage', ['Intervention sur route', 'Remorquage'], ['depannage', 'depanneuse', 'remorquage', 'remorque', 'sos', 'panne']),
 ];
 
 let catalog: ServiceCategory[] = DEFAULT_CATALOG;
@@ -75,7 +76,7 @@ export function localized(item: { label: string; labelMg?: string }, lang: Lang)
 
 export function categoryLabel(id: string, lang: Lang = 'fr'): string {
   const c = getCategory(id);
-  return c ? `${c.emoji} ${localized(c, lang)}` : id;
+  return c ? localized(c, lang) : id;
 }
 
 /** Minuscules, sans accents, ponctuation → espaces. */

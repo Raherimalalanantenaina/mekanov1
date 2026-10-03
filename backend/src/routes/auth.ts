@@ -7,6 +7,7 @@ import { config } from '../config';
 import { sendAdminValidationEmail } from '../mailer';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
 import { getConfig } from '../appSettings';
+import { createGarageForOwner, validateGarageInput } from './garages';
 
 type UserRow = {
   id: string;
@@ -20,19 +21,30 @@ type UserRow = {
 const router = Router();
 
 router.post('/register', async (req, res) => {
-  const { email, password, fullName } = req.body as {
+  const { email, password, fullName, garage } = req.body as {
     email?: string;
     password?: string;
     fullName?: string;
+    /** Inscription en une fois : compte + garage, une seule validation */
+    garage?: Record<string, unknown>;
   };
 
   if (!email || !password || !fullName) {
     return res.status(400).json({ error: 'email, password et fullName requis' });
   }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Mot de passe : 6 caractères minimum' });
+  }
+  if (garage) {
+    const garageError = await validateGarageInput(garage);
+    if (garageError) return res.status(400).json({ error: garageError });
+  }
 
   const hash = await bcrypt.hash(password, 10);
-  const needsApproval = (await getConfig()).config.approval.accounts;
-  const approvalToken = needsApproval ? crypto.randomUUID() : null;
+  const { approval } = (await getConfig()).config;
+  const needsApproval = garage ? approval.accounts || approval.garages : approval.accounts;
+  // Avec un garage, c'est l'email de validation du garage qui valide aussi le compte
+  const approvalToken = needsApproval && !garage ? crypto.randomUUID() : null;
 
   try {
     const { rows } = await query<UserRow>(
@@ -48,6 +60,21 @@ router.post('/register', async (req, res) => {
       ]
     );
     const user = rows[0];
+
+    let createdGarage: unknown = null;
+    if (garage) {
+      try {
+        const result = await createGarageForOwner(user.id, garage);
+        if (result.status !== 201) {
+          await query(`DELETE FROM users WHERE id = $1`, [user.id]);
+          return res.status(result.status).json(result.body);
+        }
+        createdGarage = result.body;
+      } catch (err) {
+        await query(`DELETE FROM users WHERE id = $1`, [user.id]);
+        throw err;
+      }
+    }
 
     if (approvalToken)
       await sendAdminValidationEmail({
@@ -75,6 +102,7 @@ router.post('/register', async (req, res) => {
         role: user.role,
         status: user.status,
       },
+      garage: createdGarage,
     });
   } catch (err: unknown) {
     const code = (err as { code?: string }).code;

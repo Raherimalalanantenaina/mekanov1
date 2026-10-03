@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -24,6 +23,7 @@ import {
   fetchMyGarages,
   updateGarage,
 } from '../api/client';
+import { CategoryIcon } from '../components/CategoryIcon';
 import { GarageCard } from '../components/GarageCard';
 import { LocationPicker, type Coords } from '../components/LocationPicker';
 import { OfflineBanner } from '../components/OfflineBanner';
@@ -38,6 +38,7 @@ import { garageFeatures, useAppConfig } from '../appConfig';
 import { garageCategoryIds, localized } from '../serviceCatalog';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { DailyStat, DayHours, Garage } from '../types';
+import { notify } from '../components/Notifier';
 
 function Input({
   icon,
@@ -196,7 +197,7 @@ export function MyGarageScreen() {
         setStats([]);
       }
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   }, [user, offline, refreshUser, t]);
 
@@ -222,7 +223,7 @@ export function MyGarageScreen() {
 
   const pickPhoto = async () => {
     if (photos.length >= MAX_PHOTOS) {
-      Alert.alert(t('limit'), t('maxPhotos', { n: MAX_PHOTOS }));
+      notify.warning(t('limit'), t('maxPhotos', { n: MAX_PHOTOS }));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -253,11 +254,11 @@ export function MyGarageScreen() {
 
   const onSubmit = async () => {
     if (offline) {
-      Alert.alert(t('offlineTitle'), t('needsConnection'));
+      notify.warning(t('offlineTitle'), t('needsConnection'));
       return;
     }
     if (!name.trim() || !address.trim()) {
-      Alert.alert(t('requiredFields'), t('nameAddressRequired'));
+      notify.warning(t('requiredFields'), t('nameAddressRequired'));
       return;
     }
     const required: [boolean, string][] = [
@@ -267,22 +268,22 @@ export function MyGarageScreen() {
     ];
     const missing = required.find(([isMissing]) => isMissing);
     if (missing) {
-      Alert.alert(t('requiredFields'), t('fieldRequired', { field: missing[1] }));
+      notify.warning(t('requiredFields'), t('fieldRequired', { field: missing[1] }));
       return;
     }
     if (form.fields.photos.required && photos.length === 0) {
-      Alert.alert(t('requiredFields'), t('photoRequired'));
+      notify.warning(t('requiredFields'), t('photoRequired'));
       return;
     }
     if (categories.length < form.minCategories) {
-      Alert.alert(t('pickCategoryTitle'), t('pickCategoryText', { n: form.minCategories }));
+      notify.warning(t('pickCategoryTitle'), t('pickCategoryText', { n: form.minCategories }));
       return;
     }
     if (!coords) {
-      Alert.alert(t('locationTitle'), t('locationRequiredText'), [
+      notify.alert(t('locationTitle'), t('locationRequiredText'), [
         { text: t('cancel'), style: 'cancel' },
         { text: 'OK', onPress: () => setPickerOpen(true) },
-      ]);
+      ], { kind: 'warning', icon: 'location' });
       return;
     }
     setBusy(true);
@@ -308,19 +309,19 @@ export function MyGarageScreen() {
       };
       if (editing) {
         await updateGarage(editing.id, payload);
-        Alert.alert(t('saved'), t('sheetUpdated'));
+        notify.success(t('saved'), t('sheetUpdated'));
       } else {
         const created = await createGarage(payload);
         if (created.status === 'pending') {
-          Alert.alert(t('submittedTitle'), t('submittedText'));
+          notify.alert(t('submittedTitle'), t('submittedText'), undefined, { kind: 'success', icon: 'hourglass-outline' });
         } else {
-          Alert.alert(t('saved'), t('sheetUpdated'));
+          notify.success(t('saved'), t('sheetUpdated'));
         }
       }
       resetForm();
       await reload();
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     } finally {
       setBusy(false);
     }
@@ -331,13 +332,13 @@ export function MyGarageScreen() {
       await updateGarage(g.id, { isOpen: !g.isOpen });
       await reload();
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
   const onDelete = () => {
     if (!editing) return;
-    Alert.alert(t('delete'), t('deleteConfirm', { name: editing.name }), [
+    notify.alert(t('delete'), t('deleteConfirm', { name: editing.name }), [
       { text: t('cancel'), style: 'cancel' },
       {
         text: t('delete'),
@@ -348,7 +349,7 @@ export function MyGarageScreen() {
             resetForm();
             await reload();
           } catch (e) {
-            Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+            notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
           }
         },
       },
@@ -370,7 +371,8 @@ export function MyGarageScreen() {
 
   const accountPending = user.status === 'pending';
   const hasGarage = mine.length >= 1;
-  const showForm = !accountPending && (Boolean(editing) || !hasGarage);
+  // Compte en attente : il peut créer / compléter sa fiche, validée en même temps que le compte
+  const showForm = Boolean(editing) || !hasGarage;
 
   return (
     <View style={styles.root}>
@@ -586,9 +588,8 @@ export function MyGarageScreen() {
                       >
                         {catOn && <View style={styles.radioDot} />}
                       </View>
-                      <Text style={styles.categoryText}>
-                        {c.emoji} {localized(c, lang)}
-                      </Text>
+                      <CategoryIcon category={c} size={18} color={catOn ? colors.teal : colors.muted} />
+                      <Text style={styles.categoryText}>{localized(c, lang)}</Text>
                     </BouncyPressable>
                     {catOn && c.subtypes.length > 0 && (
                       <View style={styles.subChipsWrap}>
@@ -750,7 +751,7 @@ export function MyGarageScreen() {
           </View>
             )}
 
-            {!accountPending && (
+            {(!accountPending || hasGarage) && (
               <Text style={styles.listLabel}>
                 {hasGarage ? t('mySheetTouch') : t('noSheetYet')}
               </Text>
@@ -769,10 +770,18 @@ export function MyGarageScreen() {
             )}
             <GarageCard garage={item} onPress={() => startEdit(item)} />
             <View style={styles.statsRow}>
-              <Text style={styles.stats}>
-                👁 {item.views} · 📞 {item.calls}
-                {item.rating != null ? ` · ★ ${item.rating}` : ''}
-              </Text>
+              <View style={styles.statsItems}>
+                <Ionicons name="eye-outline" size={14} color={colors.muted} />
+                <Text style={styles.stats}>{item.views}</Text>
+                <Ionicons name="call-outline" size={14} color={colors.muted} style={{ marginLeft: 8 }} />
+                <Text style={styles.stats}>{item.calls}</Text>
+                {item.rating != null && (
+                  <>
+                    <Ionicons name="star" size={13} color={colors.amber} style={{ marginLeft: 8 }} />
+                    <Text style={styles.stats}>{item.rating}</Text>
+                  </>
+                )}
+              </View>
               <BouncyPressable
                 onPress={() => toggleOpenQuick(item)}
                 style={[
@@ -1071,7 +1080,8 @@ const createStyles = (colors: ThemeColors) =>
     marginBottom: 14,
     paddingHorizontal: 4,
   },
-  stats: { color: colors.muted, fontSize: 12 },
+  stats: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  statsItems: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   quickOpen: {
     borderRadius: radii.pill,
     paddingHorizontal: 10,

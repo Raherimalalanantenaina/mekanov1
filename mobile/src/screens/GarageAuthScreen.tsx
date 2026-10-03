@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Linking,
   ScrollView,
@@ -12,13 +11,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { MekanoLogo } from '../components/MekanoLogo';
+import { RegisterWizard } from '../components/RegisterWizard';
 import { BouncyPressable } from '../components/Pressable';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
 import { useAppConfig } from '../appConfig';
 import { font, radii, type ThemeColors } from '../theme';
+import type { Garage } from '../types';
+import { notify } from '../components/Notifier';
 
 type Styles = ReturnType<typeof createStyles>;
 
@@ -133,10 +136,10 @@ function SupportLink({ styles }: { styles: Styles }) {
 }
 
 export function GarageAuthScreen() {
-  const { user, login, register, logout, offline } = useAuth();
+  const { user, login, logout, offline } = useAuth();
   const { t } = useI18n();
   const { colors } = useTheme();
-  const { config } = useAppConfig();
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -145,28 +148,28 @@ export function GarageAuthScreen() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('garage@mekano.app');
   const [password, setPassword] = useState('garage123');
-  const [fullName, setFullName] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (offline) {
-      Alert.alert(t('offlineTitle'), t('loginNeedsNet'));
+      notify.warning(t('offlineTitle'), t('loginNeedsNet'));
       return;
     }
     setBusy(true);
     try {
-      if (mode === 'login') await login(email.trim(), password);
-      else {
-        await register(email.trim(), password, fullName.trim());
-        if (config.approval.accounts) {
-          Alert.alert(t('accountCreatedTitle'), t('accountCreatedText'));
-        }
-      }
+      await login(email.trim(), password);
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     } finally {
       setBusy(false);
     }
+  };
+
+  const onRegistered = (garage: Garage | null) => {
+    setMode('login');
+    if (garage?.status === 'pending') notify.alert(t('registerSentTitle'), t('registerSentText'), undefined, { kind: 'success', icon: 'hourglass-outline' });
+    else notify.alert(t('registerDoneTitle'), t('registerDoneText'), undefined, { kind: 'success' });
+    navigation.navigate('Publier');
   };
 
   /* ===== Connecté ===== */
@@ -235,16 +238,10 @@ export function GarageAuthScreen() {
             </Text>
             <Text style={styles.cardSub}>{t('ownersOnly')}</Text>
 
-            {mode === 'register' && (
-              <Field
-                icon="person-outline"
-                placeholder={t('managerName')}
-                value={fullName}
-                onChangeText={setFullName}
-                styles={styles}
-                colors={colors}
-              />
-            )}
+            {mode === 'register' ? (
+              <RegisterWizard onDone={onRegistered} />
+            ) : (
+            <>
             <Field
               icon="mail-outline"
               placeholder={t('email')}
@@ -271,12 +268,12 @@ export function GarageAuthScreen() {
               style={[styles.submitWrap, busy && { opacity: 0.6 }]}
             >
               <View style={styles.submit}>
-                <Text style={styles.submitText}>
-                  {mode === 'login' ? t('signIn') : t('createAccountBtn')}
-                </Text>
+                <Text style={styles.submitText}>{t('signIn')}</Text>
                 <Ionicons name="arrow-forward" size={17} color={colors.white} />
               </View>
             </BouncyPressable>
+            </>
+            )}
 
             <Text
               style={styles.switch}

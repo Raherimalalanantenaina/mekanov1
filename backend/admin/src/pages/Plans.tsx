@@ -1,38 +1,45 @@
 import { useI18n, type TKey } from '../i18n';
 import { PLAN_FEATURES, PLAN_IDS, type Plan, type PlanId } from '../types';
-import { Check, Field } from '../ui';
+import { Check, Field, Loader, PageHead } from '../ui';
+import { mdiContentSave, mdiCrownOutline } from '@mdi/js';
+import { MdiIcon } from '../CategoryIcon';
 import { useAppConfig } from '../useAppConfig';
 
 export function Plans() {
   const { t } = useI18n();
   const { config, setConfig, save, busy } = useAppConfig();
 
-  if (!config) return <div className="empty">{t('loading')}</div>;
+  if (!config) return <Loader />;
   const setPlan = (id: PlanId, patch: Partial<Plan>) =>
     setConfig({ ...config, plans: { ...config.plans, [id]: { ...config.plans[id], ...patch } } });
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>{t('navPlans')}</h1>
-          <p className="hint">{t('plansHint')}</p>
-        </div>
+      <PageHead title={t('navPlans')} hint={t('plansHint')} icon={mdiCrownOutline}>
         <button className="btn btn-primary" disabled={busy} onClick={() => save(config)}>
-          {t('save')}
+          <MdiIcon path={mdiContentSave} size={17} /> {t('save')}
         </button>
-      </div>
+      </PageHead>
 
       <div className="grid grid-2">
         {PLAN_IDS.map((id) => {
           const plan = config.plans[id];
           return (
             <div key={id} className="card">
-              <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-                <span className={`plan-badge plan-${id}`}>{plan.name.fr || id}</span>
-                <strong>
-                  {plan.price > 0 ? `${plan.price.toLocaleString('fr-FR')} ${t('perMonth')}` : t('free')}
-                </strong>
+              <div className="plan-card-head">
+                <span className={`plan-badge plan-${id}`}>
+                  <MdiIcon path={mdiCrownOutline} size={14} />
+                  &nbsp;{plan.name.fr || id}
+                </span>
+                <span className="plan-price">
+                  {plan.price > 0 ? (
+                    <>
+                      {plan.price.toLocaleString('fr-FR')} <small>{t('perMonth')}</small>
+                    </>
+                  ) : (
+                    t('free')
+                  )}
+                </span>
               </div>
               <div className="grid grid-2">
                 <Field label={`${t('planName')} (FR)`}>

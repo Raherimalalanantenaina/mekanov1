@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useI18n } from '../i18n';
 import { PLAN_IDS, type Stats } from '../types';
-import { PlanBadge } from '../ui';
+import { Loader, PageHead, PlanBadge } from '../ui';
+import { mdiCashMultiple, mdiChartBar, mdiCrownOutline, mdiGarageVariant, mdiRefresh, mdiTableLarge, mdiViewDashboardOutline } from '@mdi/js';
+import { MdiIcon } from '../CategoryIcon';
 import { useAppConfig } from '../useAppConfig';
 
 const PLAN_COLORS: Record<string, string> = {
@@ -28,7 +30,7 @@ export function Dashboard() {
   useEffect(load, []);
 
   if (error) return <div className="empty">{error}</div>;
-  if (!stats || !config) return <div className="empty">{t('loading')}</div>;
+  if (!stats || !config) return <Loader />;
 
   // Offres expirées déjà comptées en gratuit côté serveur
   const rows = PLAN_IDS.map((id) => {
@@ -49,31 +51,48 @@ export function Dashboard() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>{t('navDashboard')}</h1>
+      <PageHead title={t('navDashboard')} icon={mdiViewDashboardOutline}>
         <button className="btn" onClick={load}>
-          {t('refresh')}
+          <MdiIcon path={mdiRefresh} size={17} /> {t('refresh')}
         </button>
-      </div>
+      </PageHead>
 
       <div className="grid stats" style={{ marginBottom: 16 }}>
         <div className="stat">
-          <div className="value">{total.toLocaleString('fr-FR')}</div>
-          <div className="label">{t('garagesTotal')}</div>
+          <span className="stat-icon" style={{ background: 'var(--teal-soft)', color: 'var(--teal)' }}>
+            <MdiIcon path={mdiGarageVariant} size={26} />
+          </span>
+          <div>
+            <div className="value">{total.toLocaleString('fr-FR')}</div>
+            <div className="label">{t('garagesTotal')}</div>
+          </div>
         </div>
         <div className="stat">
-          <div className="value">{paid.toLocaleString('fr-FR')}</div>
-          <div className="label">{t('paidGarages')}</div>
+          <span className="stat-icon" style={{ background: 'var(--amber-soft)', color: '#b26a00' }}>
+            <MdiIcon path={mdiCrownOutline} size={26} />
+          </span>
+          <div>
+            <div className="value">{paid.toLocaleString('fr-FR')}</div>
+            <div className="label">{t('paidGarages')}</div>
+          </div>
         </div>
         <div className="stat">
-          <div className="value">{ar(revenue)}</div>
-          <div className="label">{t('monthlyRevenue')}</div>
+          <span className="stat-icon" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
+            <MdiIcon path={mdiCashMultiple} size={26} />
+          </span>
+          <div>
+            <div className="value">{ar(revenue)}</div>
+            <div className="label">{t('monthlyRevenue')}</div>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-2">
         <div className="card">
-          <h3>{t('byPlan')}</h3>
+          <div className="card-title">
+            <MdiIcon path={mdiChartBar} size={20} />
+            <h3>{t('byPlan')}</h3>
+          </div>
           <div className="chart" style={{ height: 220, gap: 16 }}>
             {rows.map((r) => (
               <div
@@ -99,12 +118,16 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="card" style={{ padding: 0 }}>
+        <div className="card card-flush">
+          <div className="card-title" style={{ padding: '18px 20px 0' }}>
+            <MdiIcon path={mdiTableLarge} size={20} />
+            <h3>{t('amount')}</h3>
+          </div>
           <table>
             <thead>
               <tr>
                 <th>{t('plan')}</th>
-                <th>{t('navGarages')}</th>
+                <th>{t('tabGarages')}</th>
                 <th>{t('planPrice')}</th>
                 <th>{t('amount')}</th>
               </tr>

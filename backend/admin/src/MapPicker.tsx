@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useI18n } from './i18n';
+import { mdiCrosshairsGps } from '@mdi/js';
+import { MdiIcon } from './CategoryIcon';
 
 type Props = {
   latitude: number;
@@ -33,9 +35,10 @@ export function MapPicker({ latitude, longitude, onChange }: Props) {
   useEffect(() => {
     if (!container.current || map.current) return;
     const m = L.map(container.current).setView([latitude, longitude], 16);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap',
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      subdomains: 'abcd',
+      attribution: '© OpenStreetMap © CARTO',
     }).addTo(m);
     const mk = L.marker([latitude, longitude], { draggable: true, icon: pinIcon }).addTo(m);
     mk.on('dragend', () => {
@@ -112,7 +115,7 @@ export function MapPicker({ latitude, longitude, onChange }: Props) {
             navigator.geolocation?.getCurrentPosition((p) => moveTo(p.coords.latitude, p.coords.longitude))
           }
         >
-          📍 {t('myPosition')}
+          <MdiIcon path={mdiCrosshairsGps} size={15} /> {t('myPosition')}
         </button>
       </div>
       {results.length > 0 && (

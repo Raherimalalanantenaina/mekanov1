@@ -2,7 +2,7 @@ export type Subtype = { id: string; label: string; labelMg: string; active: bool
 
 export type Category = {
   id: string;
-  emoji: string;
+  icon: string;
   label: string;
   labelMg: string;
   keywords: string[];

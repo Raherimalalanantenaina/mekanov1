@@ -131,7 +131,7 @@ router.put(
     pushToClient(rows[0].client_id, {
       title:
         status === 'accepted'
-          ? 'Rendez-vous accepté ✅'
+          ? 'Rendez-vous accepté'
           : 'Rendez-vous refusé',
       body: `${check.rows[0].garage_name} — ${rows[0].slot}`,
       data: { type: 'appointment', appointmentId: rows[0].id },

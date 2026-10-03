@@ -3,11 +3,23 @@ import { api } from '../api';
 import { useCatalog } from '../App';
 import { useI18n } from '../i18n';
 import type { Category, Subtype } from '../types';
-import { Check, Field, Modal, useAction } from '../ui';
+import { Check, Field, IconButton, Modal, PageHead, useAction, useConfirmDelete } from '../ui';
+import {
+  mdiArrowDown,
+  mdiArrowUp,
+  mdiChevronDown,
+  mdiChevronUp,
+  mdiContentSave,
+  mdiPencilOutline,
+  mdiPlus,
+  mdiShapeOutline,
+  mdiTrashCanOutline,
+} from '@mdi/js';
+import { CATEGORY_ICONS, CategoryIcon, MdiIcon } from '../CategoryIcon';
 
-type CategoryDraft = { emoji: string; label: string; labelMg: string; keywords: string; active: boolean };
+type CategoryDraft = { icon: string; label: string; labelMg: string; keywords: string; active: boolean };
 
-const emptyDraft: CategoryDraft = { emoji: '', label: '', labelMg: '', keywords: '', active: true };
+const emptyDraft: CategoryDraft = { icon: 'wrench', label: '', labelMg: '', keywords: '', active: true };
 
 function SubtypeRow({
   sub,
@@ -24,6 +36,7 @@ function SubtypeRow({
 }) {
   const { t } = useI18n();
   const { run, busy } = useAction();
+  const confirmDelete = useConfirmDelete();
   const [label, setLabel] = useState(sub.label);
   const [labelMg, setLabelMg] = useState(sub.labelMg);
   const dirty = label !== sub.label || labelMg !== sub.labelMg;
@@ -35,33 +48,32 @@ function SubtypeRow({
 
   return (
     <div className="subtype-row">
-      <button className="btn-icon" disabled={first} onClick={() => onMove(-1)} title={t('moveUp')}>
-        ↑
-      </button>
-      <button className="btn-icon" disabled={last} onClick={() => onMove(1)} title={t('moveDown')}>
-        ↓
-      </button>
+      <IconButton icon={mdiArrowUp} size={16} disabled={first} onClick={() => onMove(-1)} label={t('moveUp')} />
+      <IconButton icon={mdiArrowDown} size={16} disabled={last} onClick={() => onMove(1)} label={t('moveDown')} />
       <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('labelFr')} />
       <input value={labelMg} onChange={(e) => setLabelMg(e.target.value)} placeholder={t('labelMg')} />
       {dirty && (
-        <button className="btn btn-sm btn-primary" disabled={busy || !label.trim()} onClick={() => save({ label, labelMg })}>
-          {t('save')}
-        </button>
+        <IconButton
+          icon={mdiContentSave}
+          tone="success"
+          disabled={busy || !label.trim()}
+          onClick={() => save({ label, labelMg })}
+          label={t('save')}
+        />
       )}
       <Check checked={sub.active} onChange={(active) => save({ active })} />
-      <button
-        className="btn-icon"
-        title={t('delete')}
-        onClick={() => {
-          if (!confirm(t('deleteSubtypeConfirm'))) return;
+      <IconButton
+        icon={mdiTrashCanOutline}
+        tone="danger"
+        label={t('delete')}
+        onClick={async () => {
+          if (!(await confirmDelete(t('deleteSubtypeConfirm')))) return;
           run(async () => {
             await api(`/catalog/subtypes/${sub.id}`, { method: 'DELETE' });
             onSaved(await api<Category[]>('/catalog'));
-          });
+          }, 'deleted');
         }}
-      >
-        🗑
-      </button>
+      />
     </div>
   );
 }
@@ -70,6 +82,7 @@ export function Catalog() {
   const { t, lang } = useI18n();
   const { catalog, setCatalog } = useCatalog();
   const { run, busy } = useAction();
+  const confirmDelete = useConfirmDelete();
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; draft: CategoryDraft } | null>(null);
   const [newSub, setNewSub] = useState<Record<string, { label: string; labelMg: string }>>({});
@@ -119,33 +132,31 @@ export function Catalog() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>{t('navCatalog')}</h1>
-          <p className="hint">{t('catalogHint')}</p>
-        </div>
+      <PageHead title={t('navCatalog')} hint={t('catalogHint')} icon={mdiShapeOutline}>
         <button className="btn btn-primary" onClick={() => setEditing({ id: null, draft: emptyDraft })}>
-          + {t('newCategory')}
+          <MdiIcon path={mdiPlus} size={18} /> {t('newCategory')}
         </button>
-      </div>
+      </PageHead>
 
       {catalog.map((cat, i) => (
         <div key={cat.id} className={`category ${cat.active ? '' : 'off'}`}>
           <div className="category-head">
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <button className="btn-icon" disabled={i === 0} onClick={() => moveCategory(i, -1)} title={t('moveUp')}>
-                ↑
+            <div className="move-btns">
+              <button className="btn-icon" disabled={i === 0} onClick={() => moveCategory(i, -1)} aria-label={t('moveUp')}>
+                <MdiIcon path={mdiChevronUp} size={18} />
               </button>
               <button
                 className="btn-icon"
                 disabled={i === catalog.length - 1}
                 onClick={() => moveCategory(i, 1)}
-                title={t('moveDown')}
+                aria-label={t('moveDown')}
               >
-                ↓
+                <MdiIcon path={mdiChevronDown} size={18} />
               </button>
             </div>
-            <span className="emoji">{cat.emoji}</span>
+            <span className="cat-icon">
+              <CategoryIcon name={cat.icon} size={22} />
+            </span>
             <div className="title">
               <strong>{(lang === 'mg' && cat.labelMg) || cat.label}</strong>
               <div className="sub">
@@ -162,13 +173,19 @@ export function Catalog() {
                 )
               }
             />
-            <button
-              className="btn btn-sm"
+            <button className="btn btn-sm" onClick={() => setOpen(open === cat.id ? null : cat.id)}>
+              {t('subtypes')} ({cat.subtypes.length})
+              <MdiIcon path={open === cat.id ? mdiChevronUp : mdiChevronDown} size={16} />
+            </button>
+            <IconButton
+              icon={mdiPencilOutline}
+              tone="primary"
+              label={t('edit')}
               onClick={() =>
                 setEditing({
                   id: cat.id,
                   draft: {
-                    emoji: cat.emoji,
+                    icon: cat.icon,
                     label: cat.label,
                     labelMg: cat.labelMg,
                     keywords: cat.keywords.join(', '),
@@ -176,24 +193,19 @@ export function Catalog() {
                   },
                 })
               }
-            >
-              {t('edit')}
-            </button>
-            <button className="btn btn-sm" onClick={() => setOpen(open === cat.id ? null : cat.id)}>
-              {t('subtypes')} {open === cat.id ? '▴' : '▾'}
-            </button>
-            <button
-              className="btn btn-sm btn-danger"
-              onClick={() => {
-                if (!confirm(t('deleteCategoryConfirm'))) return;
+            />
+            <IconButton
+              icon={mdiTrashCanOutline}
+              tone="danger"
+              label={t('delete')}
+              onClick={async () => {
+                if (!(await confirmDelete(t('deleteCategoryConfirm')))) return;
                 run(async () => {
                   await api(`/catalog/categories/${cat.id}`, { method: 'DELETE' });
                   setCatalog(catalog.filter((c) => c.id !== cat.id));
-                });
+                }, 'deleted');
               }}
-            >
-              {t('delete')}
-            </button>
+            />
           </div>
 
           {open === cat.id && (
@@ -209,7 +221,9 @@ export function Catalog() {
                 />
               ))}
               <div className="subtype-row">
-                <span style={{ width: 72 }} />
+                <span style={{ width: 68, display: 'inline-flex', justifyContent: 'center', color: 'var(--teal)' }}>
+                  <MdiIcon path={mdiPlus} size={18} />
+                </span>
                 <input
                   placeholder={`${t('newSubtype')} — ${t('labelFr')}`}
                   value={newSub[cat.id]?.label ?? ''}
@@ -227,7 +241,7 @@ export function Catalog() {
                   onKeyDown={(e) => e.key === 'Enter' && addSubtype(cat)}
                 />
                 <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => addSubtype(cat)}>
-                  {t('add')}
+                  <MdiIcon path={mdiPlus} size={16} /> {t('add')}
                 </button>
               </div>
             </div>
@@ -236,22 +250,35 @@ export function Catalog() {
       ))}
 
       {editing && (
-        <Modal title={editing.id ? t('edit') : t('newCategory')} onClose={() => setEditing(null)}>
-          <div className="grid" style={{ gridTemplateColumns: '90px 1fr' }}>
-            <Field label={t('emoji')}>
-              <input
-                value={editing.draft.emoji}
-                onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, emoji: e.target.value } })}
-                maxLength={8}
-              />
-            </Field>
-            <Field label={t('labelFr')}>
-              <input
-                value={editing.draft.label}
-                onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, label: e.target.value } })}
-                autoFocus
-              />
-            </Field>
+        <Modal
+          title={editing.id ? t('edit') : t('newCategory')}
+          onClose={() => setEditing(null)}
+          icon={editing.id ? mdiPencilOutline : mdiPlus}
+        >
+          <Field label={t('labelFr')}>
+            <input
+              value={editing.draft.label}
+              onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, label: e.target.value } })}
+              autoFocus
+            />
+          </Field>
+          <div>
+            <div className="field-label" style={{ marginBottom: 8 }}>
+              {t('icon')}
+            </div>
+            <div className="icon-grid">
+              {CATEGORY_ICONS.map((ic) => (
+                <button
+                  key={ic.name}
+                  type="button"
+                  title={ic.label}
+                  className={`icon-option ${editing.draft.icon === ic.name ? 'on' : ''}`}
+                  onClick={() => setEditing({ ...editing, draft: { ...editing.draft, icon: ic.name } })}
+                >
+                  <CategoryIcon name={ic.name} size={22} />
+                </button>
+              ))}
+            </div>
           </div>
           <Field label={t('labelMg')}>
             <input
@@ -275,6 +302,7 @@ export function Catalog() {
               {t('cancel')}
             </button>
             <button className="btn btn-primary" disabled={busy || !editing.draft.label.trim()} onClick={saveCategory}>
+              <MdiIcon path={editing.id ? mdiContentSave : mdiPlus} size={17} />
               {editing.id ? t('save') : t('create')}
             </button>
           </div>

@@ -1,12 +1,26 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  mdiBullhornOutline,
+  mdiCogOutline,
+  mdiCrownOutline,
+  mdiFormSelect,
+  mdiGarageVariant,
+  mdiLogout,
+  mdiMenu,
+  mdiShapeOutline,
+  mdiShieldCheckOutline,
+  mdiViewDashboardOutline,
+} from '@mdi/js';
 import { api, getToken, setToken } from './api';
 import { useI18n, type TKey } from './i18n';
 import type { Category, Stats } from './types';
+import { MdiIcon } from './CategoryIcon';
+import { NotificationBell } from './NotificationBell';
+import { Avatar } from './ui';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Catalog } from './pages/Catalog';
 import { Garages } from './pages/Garages';
-import { Accounts } from './pages/Accounts';
 import { Config } from './pages/Config';
 import { GarageForm } from './pages/GarageForm';
 import { Moderation } from './pages/Moderation';
@@ -35,20 +49,47 @@ export function useRefreshCounts() {
   return useContext(CountsContext);
 }
 
-const PAGES: { path: string; label: TKey; component: React.ComponentType }[] = [
-  { path: 'dashboard', label: 'navDashboard', component: Dashboard },
-  { path: 'catalog', label: 'navCatalog', component: Catalog },
-  { path: 'garages', label: 'navGarages', component: Garages },
-  { path: 'accounts', label: 'navAccounts', component: Accounts },
-  { path: 'config', label: 'navConfig', component: Config },
-  { path: 'plans', label: 'navPlans', component: Plans },
-  { path: 'garage-form', label: 'navGarageForm', component: GarageForm },
-  { path: 'moderation', label: 'navModeration', component: Moderation },
-  { path: 'push', label: 'navPush', component: Push },
+type Page = { path: string; label: TKey; icon: string; component: React.ComponentType };
+
+const SECTIONS: { label: TKey; pages: Page[] }[] = [
+  {
+    label: 'navSectionMain',
+    pages: [{ path: 'dashboard', label: 'navDashboard', icon: mdiViewDashboardOutline, component: Dashboard }],
+  },
+  {
+    label: 'navSectionManage',
+    pages: [
+      { path: 'garages', label: 'navGarages', icon: mdiGarageVariant, component: Garages },
+      { path: 'moderation', label: 'navModeration', icon: mdiShieldCheckOutline, component: Moderation },
+      { path: 'push', label: 'navPush', icon: mdiBullhornOutline, component: Push },
+    ],
+  },
+  {
+    label: 'navSectionCatalog',
+    pages: [
+      { path: 'catalog', label: 'navCatalog', icon: mdiShapeOutline, component: Catalog },
+      { path: 'plans', label: 'navPlans', icon: mdiCrownOutline, component: Plans },
+    ],
+  },
+  {
+    label: 'navSectionSettings',
+    pages: [
+      { path: 'config', label: 'navConfig', icon: mdiCogOutline, component: Config },
+      { path: 'garage-form', label: 'navGarageForm', icon: mdiFormSelect, component: GarageForm },
+    ],
+  },
 ];
 
+const PAGES = SECTIONS.flatMap((s) => s.pages);
+
+/** Paramètres après « ? » dans le hash (ex. #/garages?status=pending). */
+export function hashParams() {
+  const q = window.location.hash.split('?')[1] ?? '';
+  return new URLSearchParams(q);
+}
+
 function currentPath() {
-  const p = window.location.hash.replace(/^#\/?/, '');
+  const p = window.location.hash.replace(/^#\/?/, '').split('?')[0];
   return PAGES.some((x) => x.path === p) ? p : 'dashboard';
 }
 
@@ -57,11 +98,18 @@ export function App() {
   const [authed, setAuthed] = useState(Boolean(getToken()));
   const [email, setEmail] = useState('');
   const [path, setPath] = useState(currentPath);
+  const [hashKey, setHashKey] = useState(window.location.hash);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [logoOk, setLogoOk] = useState(true);
   const [catalog, setCatalog] = useState<Category[]>([]);
   const [counts, setCounts] = useState({ garages: 0, users: 0, plans: 0 });
 
   useEffect(() => {
-    const onHash = () => setPath(currentPath());
+    const onHash = () => {
+      setPath(currentPath());
+      setHashKey(window.location.hash);
+      setMenuOpen(false);
+    };
     const onLogout = () => setAuthed(false);
     window.addEventListener('hashchange', onHash);
     window.addEventListener('mekano-logout', onLogout);
@@ -112,34 +160,69 @@ export function App() {
     );
   }
 
-  const Page = PAGES.find((p) => p.path === path)!.component;
+  const page = PAGES.find((p) => p.path === path)!;
+  const Page = page.component;
   const badge = (p: string) =>
-    p === 'garages'
-      ? counts.garages + counts.plans
-      : p === 'accounts'
-        ? counts.users
-        : p === 'plans'
-          ? counts.plans
-          : 0;
+    p === 'garages' ? counts.garages + counts.plans : p === 'plans' ? counts.plans : 0;
+  const logout = () => {
+    setToken(null);
+    setAuthed(false);
+  };
 
   return (
     <CatalogContext.Provider value={{ catalog, setCatalog, reloadCatalog }}>
       <CountsContext.Provider value={refreshCounts}>
-        <div className="layout">
+        <div className={`layout ${menuOpen ? 'menu-open' : ''}`}>
           <aside className="sidebar">
             <div className="brand">
-              <img src="/api/config/logo" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
-              Mekano Admin
+              {logoOk ? (
+                <img src="/api/config/logo" alt="" onError={() => setLogoOk(false)} />
+              ) : (
+                <span className="brand-mark">
+                  <MdiIcon path={mdiGarageVariant} size={22} />
+                </span>
+              )}
+              <div>
+                <strong>Mekano</strong>
+                <span>Admin</span>
+              </div>
             </div>
             <nav className="nav">
-              {PAGES.map((p) => (
-                <a key={p.path} href={`#/${p.path}`} className={p.path === path ? 'active' : ''}>
-                  {t(p.label)}
-                  {badge(p.path) > 0 && <span className="count">{badge(p.path)}</span>}
-                </a>
+              {SECTIONS.map((s) => (
+                <div key={s.label} className="nav-section">
+                  <div className="nav-title">{t(s.label)}</div>
+                  {s.pages.map((p) => (
+                    <a key={p.path} href={`#/${p.path}`} className={p.path === path ? 'active' : ''}>
+                      <MdiIcon path={p.icon} size={20} />
+                      <span>{t(p.label)}</span>
+                      {badge(p.path) > 0 && <span className="count">{badge(p.path)}</span>}
+                    </a>
+                  ))}
+                </div>
               ))}
             </nav>
             <div className="sidebar-foot">
+              <Avatar name={email || 'Admin'} size={34} />
+              <div className="who">
+                <strong>Super admin</strong>
+                <span>{email}</span>
+              </div>
+              <button className="icon-btn" data-tip={t('logout')} aria-label={t('logout')} onClick={logout}>
+                <MdiIcon path={mdiLogout} size={18} />
+              </button>
+            </div>
+          </aside>
+          <div className="sidebar-scrim" onClick={() => setMenuOpen(false)} />
+          <div className="content">
+            <header className="topbar">
+              <button className="topbar-btn burger" aria-label="menu" onClick={() => setMenuOpen(true)}>
+                <MdiIcon path={mdiMenu} size={22} />
+              </button>
+              <div className="crumbs">
+                <MdiIcon path={page.icon} size={18} />
+                <span>{t(page.label)}</span>
+              </div>
+              <div className="spacer" />
               <div className="lang-switch">
                 <button className={lang === 'fr' ? 'on' : ''} onClick={() => setLang('fr')}>
                   FR
@@ -148,23 +231,12 @@ export function App() {
                   MG
                 </button>
               </div>
-              <span className="sub" style={{ color: '#9fbcbe' }}>
-                {email}
-              </span>
-              <button
-                className="btn btn-sm"
-                onClick={() => {
-                  setToken(null);
-                  setAuthed(false);
-                }}
-              >
-                {t('logout')}
-              </button>
-            </div>
-          </aside>
-          <main className="main">
-            <Page />
-          </main>
+              <NotificationBell onChange={refreshCounts} />
+            </header>
+            <main className="main">
+              <Page key={hashKey} />
+            </main>
+          </div>
         </div>
       </CountsContext.Provider>
     </CatalogContext.Provider>

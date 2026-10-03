@@ -1,5 +1,5 @@
 import { pool } from './pool';
-import { loadCatalog, resolveCategories, seedCatalogIfEmpty } from '../serviceCatalog';
+import { defaultIconFor, loadCatalog, resolveCategories, seedCatalogIfEmpty } from '../serviceCatalog';
 
 const SQL = `
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -141,6 +141,8 @@ CREATE TABLE IF NOT EXISTS service_subtypes (
   active BOOLEAN NOT NULL DEFAULT true
 );
 CREATE INDEX IF NOT EXISTS idx_subtypes_category ON service_subtypes (category_id);
+-- Icône (MaterialCommunityIcons) à la place de l'ancien emoji
+ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS icon TEXT NOT NULL DEFAULT '';
 
 -- Offres (free / basic / standard / premium). Les garages déjà en ligne
 -- passent en premium sans date de fin ; les nouveaux démarrent en gratuit.
@@ -170,6 +172,15 @@ async function migrate() {
   await pool.query(SQL);
 
   await seedCatalogIfEmpty();
+  const noIcon = await pool.query<{ id: string }>(
+    `SELECT id FROM service_categories WHERE icon = ''`
+  );
+  for (const { id } of noIcon.rows) {
+    await pool.query(`UPDATE service_categories SET icon = $2 WHERE id = $1`, [
+      id,
+      defaultIconFor(id) ?? 'wrench',
+    ]);
+  }
   await loadCatalog();
   // Un seul type par garage : classe les garages sans type à partir de leurs
   // services, et réduit à un type ceux qui en ont plusieurs

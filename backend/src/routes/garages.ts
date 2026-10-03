@@ -387,7 +387,38 @@ router.post('/:id/reviews', async (req, res) => {
   return res.status(201).json(rows[0]);
 });
 
-router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
+type CreateResult = { status: number; body: unknown };
+
+/** Le garage est validé : un compte encore en attente l'est aussi (une seule validation). */
+export async function approveOwnerOf(garageId: string) {
+  await query(
+    `UPDATE users SET status = 'approved', approval_token = NULL
+     WHERE id = (SELECT owner_id FROM garages WHERE id = $1) AND status = 'pending'`,
+    [garageId]
+  );
+}
+
+/** Contrôles du formulaire garage, sans écrire en base (utilisé avant de créer le compte). */
+export async function validateGarageInput(b: Record<string, any>): Promise<string | null> {
+  if (!b?.name?.trim?.() || !b?.address?.trim?.() || b.latitude == null || b.longitude == null) {
+    return 'Nom, adresse et localisation du garage requis';
+  }
+  if (!Number.isFinite(Number(b.latitude)) || !Number.isFinite(Number(b.longitude))) {
+    return 'Localisation invalide';
+  }
+  const { config: appConfig } = await getConfig();
+  const categories = resolveCategories(b.categories ?? [], b.services ?? []);
+  return checkGarageForm(appConfig, {
+    phone: b.phone,
+    city: b.city,
+    description: b.description,
+    photos: b.photos ?? [],
+    categories,
+  });
+}
+
+/** Crée le garage d'un compte (1 compte = 1 garage). */
+export async function createGarageForOwner(ownerId: string, b: Record<string, any>): Promise<CreateResult> {
   const {
     name,
     description = '',
@@ -405,51 +436,37 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
     openingHours = 'Lun–Sam 8h–18h',
     hoursJson = null,
     isOpen = true,
-  } = req.body;
+  } = b;
 
-  if (!name || !address || latitude == null || longitude == null) {
-    return res
-      .status(400)
-      .json({ error: 'name, address, latitude, longitude requis' });
-  }
+  const inputError = await validateGarageInput(b);
+  if (inputError) return { status: 400, body: { error: inputError } };
 
-  // Le compte doit avoir été validé par l'administrateur
   const owner = await query<{ status: string; email: string; full_name: string }>(
     `SELECT status, email, full_name FROM users WHERE id = $1`,
-    [req.user!.id]
+    [ownerId]
   );
-  if (owner.rows[0]?.status !== 'approved') {
-    return res.status(403).json({
-      error:
-        'Ton compte est en attente de validation par l’administrateur. Tu pourras publier ton garage dès qu’il sera validé.',
-    });
+  if (!owner.rows[0] || owner.rows[0].status === 'suspended') {
+    return { status: 403, body: { error: 'Compte suspendu par l’administrateur' } };
   }
+  const ownerPending = owner.rows[0].status === 'pending';
 
-  // Un seul garage par compte
   const existing = await query<{ count: string }>(
     `SELECT COUNT(*) AS count FROM garages WHERE owner_id = $1`,
-    [req.user!.id]
+    [ownerId]
   );
   if (Number(existing.rows[0].count) >= 1) {
-    return res.status(409).json({
-      error:
-        'Un seul garage par compte. Modifie ta fiche existante au lieu d’en créer une nouvelle.',
-    });
+    return {
+      status: 409,
+      body: { error: 'Un seul garage par compte. Modifie ta fiche existante au lieu d’en créer une nouvelle.' },
+    };
   }
 
   const { config: appConfig } = await getConfig();
   const categories = resolveCategories(rawCategories, rawServices);
   const services = servicesForCategory(categories, rawServices);
-  const formError = checkGarageForm(appConfig, {
-    phone,
-    city,
-    description,
-    photos,
-    categories,
-  });
-  if (formError) return res.status(400).json({ error: formError });
 
-  const needsApproval = appConfig.approval.garages;
+  // Compte en attente : la validation du garage validera aussi le compte
+  const needsApproval = appConfig.approval.garages || ownerPending;
   const approvalToken = needsApproval ? crypto.randomUUID() : null;
 
   const { rows } = await query<GarageRow>(
@@ -460,14 +477,14 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      RETURNING *`,
     [
-      req.user!.id,
-      name,
+      ownerId,
+      String(name).trim(),
       description,
-      address,
+      String(address).trim(),
       city,
       phone,
-      latitude,
-      longitude,
+      Number(latitude),
+      Number(longitude),
       services,
       photos,
       mobileService,
@@ -482,22 +499,31 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
     ]
   );
 
-  if (approvalToken) await sendAdminValidationEmail({
-    subject: 'Nouveau garage à valider',
-    intro: 'Un nouveau garage vient d’être publié sur Mekano et attend ta validation avant d’être visible par les clients.',
-    details: {
-      Garage: name,
-      Adresse: `${address}${city ? `, ${city}` : ''}`,
-      'Téléphone': phone || '—',
-      'Type de service': categories.map(categoryLabel).join(', ') || '—',
-      'Sous-types': services.join(', ') || '—',
-      'Propriétaire': `${owner.rows[0].full_name} (${owner.rows[0].email})`,
-    },
-    approveUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/approve`,
-    rejectUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/reject`,
-  });
+  if (approvalToken) {
+    await sendAdminValidationEmail({
+      subject: ownerPending ? 'Nouveau garagiste à valider' : 'Nouveau garage à valider',
+      intro: ownerPending
+        ? 'Un nouveau garagiste vient de s’inscrire avec son garage. Valider le garage valide aussi son compte.'
+        : 'Un nouveau garage vient d’être publié sur Mekano et attend ta validation avant d’être visible par les clients.',
+      details: {
+        Garage: name,
+        Adresse: `${address}${city ? `, ${city}` : ''}`,
+        'Téléphone': phone || '—',
+        'Type de service': categories.map(categoryLabel).join(', ') || '—',
+        'Sous-types': services.join(', ') || '—',
+        'Propriétaire': `${owner.rows[0].full_name} (${owner.rows[0].email})`,
+      },
+      approveUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/approve`,
+      rejectUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/reject`,
+    });
+  }
 
-  return res.status(201).json(await withPlan(mapGarage(rows[0]), { public: false }));
+  return { status: 201, body: await withPlan(mapGarage(rows[0]), { public: false }) };
+}
+
+router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
+  const result = await createGarageForOwner(req.user!.id, req.body ?? {});
+  return res.status(result.status).json(result.body);
 });
 
 router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {

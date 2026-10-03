@@ -10,9 +10,11 @@ import { registerPushToken } from './api/client';
  * hors ligne…) : l'app fonctionne normalement sans notifications.
  */
 
+// App ouverte : pas de bannière système, le NotifierProvider affiche un
+// bandeau in-app à la place.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,
+    shouldShowBanner: false,
     shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,

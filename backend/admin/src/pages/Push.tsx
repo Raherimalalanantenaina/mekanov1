@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { api } from '../api';
 import { useI18n } from '../i18n';
-import { Field, useAction, useToast } from '../ui';
+import { Field, PageHead, useAction, useToast } from '../ui';
+import { mdiAccountGroupOutline, mdiBullhornOutline, mdiCellphone, mdiSend } from '@mdi/js';
+import { MdiIcon } from '../CategoryIcon';
 
 type Audience = 'all' | 'clients' | 'garages';
 
@@ -16,17 +18,20 @@ export function Push() {
   const send = () =>
     run(async () => {
       const res = await api<{ sent: number }>('/push', { method: 'POST', body: { title, body, audience } });
-      toast(t('sentTo', { n: res.sent }));
+      toast(t('sentTo', { n: res.sent }), 'ok', t('navPush'));
       setTitle('');
       setBody('');
     }, null);
 
   return (
     <>
-      <div className="page-head">
-        <h1>{t('navPush')}</h1>
-      </div>
-      <div className="card" style={{ maxWidth: 560 }}>
+      <PageHead title={t('navPush')} icon={mdiBullhornOutline} />
+      <div className="grid grid-2" style={{ alignItems: 'start', maxWidth: 980 }}>
+      <div className="card">
+        <div className="card-title">
+          <MdiIcon path={mdiAccountGroupOutline} size={20} />
+          <h3>{t('audience')}</h3>
+        </div>
         <div className="grid">
           <Field label={t('audience')}>
             <select value={audience} onChange={(e) => setAudience(e.target.value as Audience)}>
@@ -43,10 +48,27 @@ export function Push() {
           </Field>
           <div>
             <button className="btn btn-primary" disabled={busy || !title.trim() || !body.trim()} onClick={send}>
-              {t('send')}
+              <MdiIcon path={mdiSend} size={17} /> {t('send')}
             </button>
           </div>
         </div>
+      </div>
+      <div className="card">
+        <div className="card-title">
+          <MdiIcon path={mdiCellphone} size={20} />
+          <h3>{t('preview')}</h3>
+        </div>
+        <div className="push-preview">
+          <span className="push-app">
+            <img src="/api/config/logo" alt="" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+          </span>
+          <div>
+            <div className="push-meta">Mekano · {t('now')}</div>
+            <strong>{title || t('pushTitle')}</strong>
+            <div className="sub">{body || t('pushBody')}</div>
+          </div>
+        </div>
+      </div>
       </div>
     </>
   );

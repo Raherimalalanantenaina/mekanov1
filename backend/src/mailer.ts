@@ -39,12 +39,12 @@ export async function sendAdminValidationEmail(opts: {
       <p style="margin:24px 0;">
         <a href="${opts.approveUrl}"
            style="background:#0f766e;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:bold;">
-          ✅ Valider
+          Valider
         </a>
         &nbsp;&nbsp;
         <a href="${opts.rejectUrl}"
            style="background:#dc2626;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:bold;">
-          ❌ Refuser
+          Refuser
         </a>
       </p>
       <p><a href="${config.publicUrl}/admin/" style="color:#0f766e;">Ouvrir le site super admin</a></p>

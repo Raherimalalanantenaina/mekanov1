@@ -291,19 +291,22 @@ export async function login(email: string, password: string) {
   return data;
 }
 
+/** Inscription ; avec `garage`, le compte et la fiche sont créés ensemble. */
 export async function register(
   email: string,
   password: string,
-  fullName: string
+  fullName: string,
+  garage?: Partial<Garage>
 ) {
-  const data = await api<{ token: string; user: AuthUser }>(
+  const data = await api<{ token: string; user: AuthUser; garage?: Garage | null }>(
     '/api/auth/register',
     {
       method: 'POST',
-      body: JSON.stringify({ email, password, fullName }),
+      body: JSON.stringify({ email, password, fullName, garage }),
     }
   );
   await saveSession(data.token, data.user);
+  if (data.garage) void upsertCachedGarage(data.garage);
   return data;
 }
 

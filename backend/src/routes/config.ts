@@ -14,7 +14,7 @@ router.get('/', async (_req, res, next) => {
       config,
       catalog: getPublicCatalog().map((c) => ({
         id: c.id,
-        emoji: c.emoji,
+        icon: c.icon,
         label: c.label,
         labelMg: c.labelMg,
         keywords: c.keywords,

@@ -15,7 +15,7 @@ import {
   login as apiLogin,
   register as apiRegister,
 } from '../api/client';
-import type { AuthUser } from '../types';
+import type { AuthUser, Garage } from '../types';
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -25,8 +25,9 @@ type AuthContextValue = {
   register: (
     email: string,
     password: string,
-    fullName: string
-  ) => Promise<void>;
+    fullName: string,
+    garage?: Partial<Garage>
+  ) => Promise<Garage | null>;
   logout: () => Promise<void>;
   refreshConnectivity: () => Promise<void>;
   /** Recharge le profil depuis l'API (statut de validation). */
@@ -81,10 +82,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user);
         setOffline(false);
       },
-      register: async (email, password, fullName) => {
-        const data = await apiRegister(email, password, fullName);
+      register: async (email, password, fullName, garage) => {
+        const data = await apiRegister(email, password, fullName, garage);
         setUser(data.user);
         setOffline(false);
+        return data.garage ?? null;
       },
       logout: async () => {
         await clearSession();

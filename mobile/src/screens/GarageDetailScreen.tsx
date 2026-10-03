@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -40,6 +39,7 @@ import { categoryLabel, garageCategoryIds } from '../serviceCatalog';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage, Review } from '../types';
 import type { RootStackParamList } from '../navigation/types';
+import { notify } from '../components/Notifier';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GarageDetail'>;
 
@@ -178,7 +178,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
 
   const onSubmitReview = async () => {
     if (!rName.trim()) {
-      Alert.alert(t('nameRequired'));
+      notify.warning(t('nameRequired'));
       return;
     }
     try {
@@ -191,15 +191,15 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       setGarage(await fetchGarageById(id));
       setShowReview(false);
       setRComment('');
-      Alert.alert(t('thanks'), t('reviewPublished'));
+      notify.success(t('thanks'), t('reviewPublished'));
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
   const onSubmitQuote = async () => {
     if (!qName.trim() || !qDesc.trim()) {
-      Alert.alert(t('requiredFields'), t('nameDescRequired'));
+      notify.warning(t('requiredFields'), t('nameDescRequired'));
       return;
     }
     try {
@@ -213,15 +213,15 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       setShowQuote(false);
       setQDesc('');
       setQPhoto('');
-      Alert.alert(t('sent'), t('quoteSent'));
+      notify.success(t('sent'), t('quoteSent'));
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
   const onSubmitBooking = async () => {
     if (!bName.trim()) {
-      Alert.alert(t('requiredFields'), t('yourNameRequired'));
+      notify.warning(t('requiredFields'), t('yourNameRequired'));
       return;
     }
     const slot = `${bDate.toLocaleDateString('fr-FR')} à ${bDate.toLocaleTimeString(
@@ -238,9 +238,9 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       });
       setShowBooking(false);
       setBNote('');
-      Alert.alert(t('sent'), t('bookingSent'));
+      notify.success(t('sent'), t('bookingSent'));
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     }
   };
 
@@ -291,9 +291,12 @@ export function GarageDetailScreen({ route, navigation }: Props) {
           <Ionicons name="location" size={13} color="rgba(255,255,255,0.8)" />
           <Text style={styles.city}>{garage.city}</Text>
           {features.reviews && garage.rating != null && (
-            <Text style={styles.ratingPill}>
-              ★ {garage.rating.toFixed(1)} ({garage.reviewCount})
-            </Text>
+            <View style={styles.ratingRow}>
+              <Ionicons name="star" size={12} color={colors.amber} />
+              <Text style={styles.ratingPill}>
+                {garage.rating.toFixed(1)} ({garage.reviewCount})
+              </Text>
+            </View>
           )}
           <View
             style={[
@@ -516,9 +519,16 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             <View key={r.id} style={[styles.reviewCard, shadow.card]}>
               <View style={styles.reviewTop}>
                 <Text style={styles.reviewAuthor}>{r.authorName}</Text>
-                <Text style={styles.reviewStars}>
-                  {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
-                </Text>
+                <View style={styles.reviewStars}>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Ionicons
+                      key={i}
+                      name={i <= r.rating ? 'star' : 'star-outline'}
+                      size={13}
+                      color={colors.amberDark}
+                    />
+                  ))}
+                </View>
               </View>
               {!!r.comment && (
                 <Text style={styles.reviewComment}>{r.comment}</Text>
@@ -742,11 +752,11 @@ const createStyles = (colors: ThemeColors) =>
     fontSize: 13.5,
     fontWeight: font.semibold,
   },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4 },
   ratingPill: {
     color: colors.amber,
     fontWeight: font.bold,
     fontSize: 12,
-    marginLeft: 4,
   },
   statusPill: {
     marginLeft: 4,
@@ -895,7 +905,7 @@ const createStyles = (colors: ThemeColors) =>
     alignItems: 'center',
   },
   reviewAuthor: { fontWeight: font.extrabold, color: colors.ink },
-  reviewStars: { color: colors.amberDark, letterSpacing: 1 },
+  reviewStars: { flexDirection: 'row', gap: 1 },
   reviewComment: { marginTop: 6, color: colors.muted, lineHeight: 19 },
   modalBg: {
     flex: 1,

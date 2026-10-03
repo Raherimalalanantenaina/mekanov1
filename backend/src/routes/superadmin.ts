@@ -8,6 +8,7 @@ import { requireSuperAdmin, SuperAdminRequest } from '../middleware/auth';
 import { getConfig, getLogoVersion, saveConfig, saveLogo } from '../appSettings';
 import {
   getFullCatalog,
+  isCategoryIcon,
   loadCatalog,
   normalize,
   resolveCategories,
@@ -15,7 +16,7 @@ import {
   slugify,
 } from '../serviceCatalog';
 import { pushBroadcast, pushToUser } from '../push';
-import { GarageRow, mapGarage, RATING_SELECT } from './garages';
+import { approveOwnerOf, GarageRow, mapGarage, RATING_SELECT } from './garages';
 import { effectivePlanSql, isPlanId } from '../plans';
 
 const router = Router();
@@ -138,6 +139,40 @@ router.get(
   })
 );
 
+// ─── Notifications du back-office ───────────────────────────────────────────
+
+/** Tâches à traiter (inscriptions, demandes d'offre, comptes) + avis récents. */
+router.get(
+  '/notifications',
+  h(async (_req, res) => {
+    const { rows } = await query<{
+      kind: string;
+      id: string;
+      title: string;
+      detail: string | null;
+      at: string;
+    }>(`
+      (SELECT 'registration' AS kind, g.id, g.name AS title, u.full_name AS detail, g.created_at AS at
+         FROM garages g JOIN users u ON u.id = g.owner_id
+        WHERE g.status = 'pending')
+      UNION ALL
+      (SELECT 'plan_request', g.id, g.name, g.plan_request, COALESCE(g.plan_requested_at, g.created_at)
+         FROM garages g WHERE g.plan_request IS NOT NULL)
+      UNION ALL
+      (SELECT 'account', u.id, u.full_name, u.email, u.created_at
+         FROM users u LEFT JOIN garages g ON g.owner_id = u.id
+        WHERE u.status = 'pending' AND g.id IS NULL)
+      UNION ALL
+      (SELECT 'review', r.id, g.name, r.author_name || ' · ' || r.rating || '/5', r.created_at
+         FROM reviews r JOIN garages g ON g.id = r.garage_id
+        WHERE r.created_at > NOW() - INTERVAL '7 days')
+      ORDER BY at DESC
+      LIMIT 50
+    `);
+    return res.json(rows);
+  })
+);
+
 // ─── Catalogue des types de service ─────────────────────────────────────────
 
 function cleanKeywords(v: unknown): string[] {
@@ -157,10 +192,10 @@ router.get('/catalog', h(async (_req, res) => res.json(getFullCatalog())));
 router.post(
   '/catalog/categories',
   h(async (req, res) => {
-    const { label, labelMg = '', emoji = '', keywords, active = true } = req.body as {
+    const { label, labelMg = '', icon, keywords, active = true } = req.body as {
       label?: string;
       labelMg?: string;
-      emoji?: string;
+      icon?: string;
       keywords?: unknown;
       active?: boolean;
     };
@@ -169,10 +204,17 @@ router.post(
     const taken = new Set(getFullCatalog().map((c) => c.id));
     for (let i = 2; taken.has(id); i++) id = `${slugify(label)}-${i}`;
     await query(
-      `INSERT INTO service_categories (id, emoji, label_fr, label_mg, keywords, position, active)
+      `INSERT INTO service_categories (id, icon, label_fr, label_mg, keywords, position, active)
        VALUES ($1,$2,$3,$4,$5,
          (SELECT COALESCE(MAX(position), -1) + 1 FROM service_categories), $6)`,
-      [id, emoji, label.trim(), labelMg.trim(), cleanKeywords(keywords), Boolean(active)]
+      [
+        id,
+        isCategoryIcon(icon) ? icon : 'wrench',
+        label.trim(),
+        labelMg.trim(),
+        cleanKeywords(keywords),
+        Boolean(active),
+      ]
     );
     await loadCatalog();
     return res.status(201).json(getFullCatalog().find((c) => c.id === id));
@@ -197,7 +239,7 @@ router.put(
     const cat = getFullCatalog().find((c) => c.id === req.params.id);
     if (!cat) return res.status(404).json({ error: 'Type introuvable' });
     const b = req.body as {
-      emoji?: string;
+      icon?: string;
       label?: string;
       labelMg?: string;
       keywords?: unknown;
@@ -205,11 +247,11 @@ router.put(
     };
     await query(
       `UPDATE service_categories
-       SET emoji = $2, label_fr = $3, label_mg = $4, keywords = $5, active = $6
+       SET icon = $2, label_fr = $3, label_mg = $4, keywords = $5, active = $6
        WHERE id = $1`,
       [
         cat.id,
-        b.emoji ?? cat.emoji,
+        isCategoryIcon(b.icon) ? b.icon : cat.icon,
         b.label?.trim() || cat.label,
         b.labelMg !== undefined ? String(b.labelMg).trim() : cat.labelMg,
         b.keywords !== undefined ? cleanKeywords(b.keywords) : cat.keywords,
@@ -691,9 +733,10 @@ router.put(
        WHERE id = $${params.length} RETURNING *`,
       params
     );
+    if (b.status === 'approved') await approveOwnerOf(g.id);
     if (b.status === 'approved' && g.status !== 'approved') {
       pushToUser(g.owner_id, {
-        title: 'Garage validé ✅',
+        title: 'Garage validé',
         body: `${rows[0].name} est maintenant visible par les clients.`,
       }).catch(() => {});
     }
@@ -704,7 +747,7 @@ router.put(
         ? ` jusqu’au ${new Date(rows[0].plan_expires_at).toLocaleDateString('fr-FR')}`
         : '';
       pushToUser(g.owner_id, {
-        title: `Offre ${name} activée 🎉`,
+        title: `Offre ${name} activée`,
         body: `${rows[0].name} profite de l’offre ${name}${until}.`,
       }).catch(() => {});
     }
@@ -818,7 +861,7 @@ router.put(
     }
     if (status === 'approved' && u.status === 'pending') {
       pushToUser(req.params.id, {
-        title: 'Compte validé ✅',
+        title: 'Compte validé',
         body: 'Tu peux maintenant publier ton garage.',
       }).catch(() => {});
     }

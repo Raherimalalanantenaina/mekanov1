@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cancelPlanRequest, requestPlan } from '../api/client';
 import { PLAN_FEATURES, PLAN_IDS, planName, useAppConfig } from '../appConfig';
@@ -8,6 +8,7 @@ import { useI18n, type TKey } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage, PlanId } from '../types';
 import { BouncyPressable } from './Pressable';
+import { notify } from './Notifier';
 
 /** « Mon offre » : offre en cours et demande de changement (activée par le super admin). */
 export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: () => void }) {
@@ -24,7 +25,7 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
       : t('planFree');
 
   const onRequest = (id: PlanId) => {
-    Alert.alert(
+    notify.alert(
       t('planRequestTitle', { p: planName(config, id, lang) }),
       t('planRequestText', { price: price(id) }),
       [
@@ -35,10 +36,10 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
             setBusy(true);
             try {
               await requestPlan(garage.id, id);
-              Alert.alert(t('planRequested'), t('planRequestSent'));
+              notify.success(t('planRequested'), t('planRequestSent'));
               onChanged();
             } catch (e) {
-              Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+              notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
             } finally {
               setBusy(false);
             }
@@ -54,7 +55,7 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
       await cancelPlanRequest(garage.id);
       onChanged();
     } catch (e) {
-      Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
+      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
     } finally {
       setBusy(false);
     }

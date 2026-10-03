@@ -203,7 +203,7 @@ router.post('/:id/messages', async (req, res) => {
       // Le garage a répondu → notifie le client
       pushToClient(row.client_id, {
         title: row.garage_name ?? 'Mekano',
-        body: body.trim() || '📷 Photo',
+        body: body.trim() || 'Photo',
         data: { type: 'quote', quoteId: req.params.id },
       }).catch(() => {});
       return res.status(201).json(mapMessage(rows[0]));
@@ -220,7 +220,7 @@ router.post('/:id/messages', async (req, res) => {
   // Le client a écrit → notifie le propriétaire du garage
   pushToUser(row.garage_owner, {
     title: `${row.client_name} — devis`,
-    body: body.trim() || '📷 Photo',
+    body: body.trim() || 'Photo',
     data: { type: 'quote', quoteId: req.params.id },
   }).catch(() => {});
   return res.status(201).json(mapMessage(rows[0]));

@@ -3,9 +3,26 @@ import { api, compressImage } from '../api';
 import { useCatalog } from '../App';
 import { useI18n } from '../i18n';
 import { PLAN_IDS, type GarageDetail, type GarageStatus, type PlanId, type PriceItem, type UserItem } from '../types';
-import { addMonths, Check, Field, Modal, PlanBadge, useAction } from '../ui';
+import { addMonths, Avatar, Check, Field, IconButton, Modal, PlanBadge, useAction } from '../ui';
 import { useAppConfig } from '../useAppConfig';
 import { MapPicker } from '../MapPicker';
+import {
+  mdiAccountOutline,
+  mdiClose,
+  mdiContentSave,
+  mdiCrownOutline,
+  mdiGarageVariant,
+  mdiImageMultipleOutline,
+  mdiImagePlus,
+  mdiInformationOutline,
+  mdiMapMarkerOutline,
+  mdiPlus,
+  mdiShapeOutline,
+  mdiStorePlusOutline,
+  mdiTagOutline,
+  mdiTrashCanOutline,
+} from '@mdi/js';
+import { CategoryIcon, MdiIcon } from '../CategoryIcon';
 
 type Draft = {
   name: string;
@@ -55,10 +72,13 @@ const blank: Draft = {
 /** Création (id = null) ou modification d'un garage par le super admin. */
 export function GarageEditor({
   id,
+  presetOwnerId,
   onClose,
   onSaved,
 }: {
   id: string | null;
+  /** Compte existant à qui créer le garage */
+  presetOwnerId?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -66,8 +86,8 @@ export function GarageEditor({
   const { catalog } = useCatalog();
   const { run, busy } = useAction();
   const [draft, setDraft] = useState<Draft | null>(id ? null : blank);
-  const [ownerMode, setOwnerMode] = useState<'existing' | 'new'>('new');
-  const [ownerId, setOwnerId] = useState('');
+  const [ownerMode, setOwnerMode] = useState<'existing' | 'new'>(presetOwnerId ? 'existing' : 'new');
+  const [ownerId, setOwnerId] = useState(presetOwnerId ?? '');
   const [owner, setOwner] = useState({ email: '', fullName: '', password: '' });
   const [users, setUsers] = useState<UserItem[]>([]);
   const [ownerLabel, setOwnerLabel] = useState('');
@@ -116,7 +136,7 @@ export function GarageEditor({
 
   if (!draft) {
     return (
-      <Modal title={t('editGarage')} onClose={onClose} wide>
+      <Modal title={t('editGarage')} onClose={onClose} wide icon={mdiGarageVariant}>
         <div className="empty">{t('loading')}</div>
       </Modal>
     );
@@ -187,11 +207,21 @@ export function GarageEditor({
     (id || (ownerMode === 'existing' ? ownerId : owner.email && owner.fullName && owner.password.length >= 6));
 
   return (
-    <Modal title={id ? t('editGarage') : t('newGarage')} onClose={onClose} wide>
+    <Modal
+      title={id ? t('editGarage') : t('newGarage')}
+      onClose={onClose}
+      wide
+      icon={id ? mdiGarageVariant : mdiStorePlusOutline}
+    >
       <div className="card" style={{ marginBottom: 0 }}>
-        <h3>{t('owner')}</h3>
+        <div className="section-title">
+          <MdiIcon path={mdiAccountOutline} size={18} /> {t('ownerAccount')}
+        </div>
         {id ? (
-          <div className="sub">{ownerLabel}</div>
+          <div className="cell-main">
+            <Avatar name={ownerLabel || '?'} size={34} />
+            <span>{ownerLabel}</span>
+          </div>
         ) : (
           <>
             <div className="row" style={{ marginBottom: 10 }}>
@@ -236,7 +266,9 @@ export function GarageEditor({
       </div>
 
       <div className="card" style={{ marginBottom: 0 }}>
-        <h3>{t('plan')}</h3>
+        <div className="section-title">
+          <MdiIcon path={mdiCrownOutline} size={18} /> {t('plan')}
+        </div>
         {planMeta.request && (
           <div className="plan-request" style={{ marginBottom: 10 }}>
             {t('planRequested', { p: planName(planMeta.request) })}
@@ -301,6 +333,9 @@ export function GarageEditor({
         )}
       </div>
 
+      <div className="section-title" style={{ marginBottom: -4 }}>
+        <MdiIcon path={mdiInformationOutline} size={18} /> {t('identity')}
+      </div>
       <div className="grid grid-2">
         <Field label={`${t('name')} *`}>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} />
@@ -333,8 +368,8 @@ export function GarageEditor({
       </div>
 
       <div>
-        <div className="field-label" style={{ marginBottom: 8 }}>
-          {t('location')} *
+        <div className="section-title">
+          <MdiIcon path={mdiMapMarkerOutline} size={18} /> {t('location')} *
         </div>
         <MapPicker
           latitude={Number(draft.latitude) || -18.8792}
@@ -348,8 +383,8 @@ export function GarageEditor({
       </Field>
 
       <div>
-        <div className="field-label" style={{ marginBottom: 8 }}>
-          {t('types')}
+        <div className="section-title">
+          <MdiIcon path={mdiShapeOutline} size={18} /> {t('types')}
         </div>
         {catalog.map((c) => {
           const on = draft.categories.includes(c.id);
@@ -363,7 +398,8 @@ export function GarageEditor({
                   checked={on}
                   onChange={() => selectCategory(c.id)}
                 />
-                {c.emoji} {(lang === 'mg' && c.labelMg) || c.label}
+                <CategoryIcon name={c.icon} size={18} />
+                {(lang === 'mg' && c.labelMg) || c.label}
               </label>
               {on && (
                 <div style={{ paddingLeft: 46, marginTop: 4 }}>
@@ -395,20 +431,21 @@ export function GarageEditor({
       </Field>
 
       <div>
-        <div className="field-label" style={{ marginBottom: 8 }}>
-          {t('photos')} ({draft.photos.length})
+        <div className="section-title">
+          <MdiIcon path={mdiImageMultipleOutline} size={18} /> {t('photos')} ({draft.photos.length})
         </div>
         <div className="photos">
           {draft.photos.map((p, i) => (
             <div key={i} className="photo">
               <img src={p} alt="" />
               <button type="button" onClick={() => set('photos', draft.photos.filter((_, j) => j !== i))}>
-                ✕
+                <MdiIcon path={mdiClose} size={14} />
               </button>
             </div>
           ))}
-          <label className="btn btn-sm" style={{ alignSelf: 'center' }}>
-            + {t('addPhotos')}
+          <label className="photo-add">
+            <MdiIcon path={mdiImagePlus} size={22} />
+            {t('addPhotos')}
             <input type="file" accept="image/*" multiple hidden onChange={(e) => addPhotos(e.target.files)} />
           </label>
         </div>
@@ -425,8 +462,8 @@ export function GarageEditor({
       </div>
 
       <div>
-        <div className="field-label" style={{ marginBottom: 8 }}>
-          {t('prices')}
+        <div className="section-title">
+          <MdiIcon path={mdiTagOutline} size={18} /> {t('prices')}
         </div>
         {draft.priceList.map((p, i) => (
           <div key={i} className="row" style={{ marginBottom: 6, flexWrap: 'nowrap' }}>
@@ -441,13 +478,16 @@ export function GarageEditor({
               style={{ maxWidth: 160 }}
               onChange={(e) => set('priceList', draft.priceList.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))}
             />
-            <button className="btn-icon" onClick={() => set('priceList', draft.priceList.filter((_, j) => j !== i))}>
-              🗑
-            </button>
+            <IconButton
+              icon={mdiTrashCanOutline}
+              tone="danger"
+              label={t('delete')}
+              onClick={() => set('priceList', draft.priceList.filter((_, j) => j !== i))}
+            />
           </div>
         ))}
         <button className="btn btn-sm" onClick={() => set('priceList', [...draft.priceList, { service: '', price: '' }])}>
-          + {t('add')}
+          <MdiIcon path={mdiPlus} size={16} /> {t('add')}
         </button>
       </div>
 
@@ -456,6 +496,7 @@ export function GarageEditor({
           {t('cancel')}
         </button>
         <button className="btn btn-primary" disabled={busy || !canSave} onClick={save}>
+          <MdiIcon path={id ? mdiContentSave : mdiPlus} size={17} />
           {id ? t('save') : t('create')}
         </button>
       </div>
