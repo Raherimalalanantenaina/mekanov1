@@ -3,14 +3,16 @@
  * JSON embarqué = la carte s'affiche même hors ligne (tuiles déjà
  * consultées restent en cache MapLibre).
  */
+import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 import mekanoDark from './mekano-dark.json';
 import mekanoLight from './mekano-light.json';
 
-export const MAP_STYLE_LIGHT = mekanoLight;
-export const MAP_STYLE_DARK = mekanoDark;
+// Le JSON importé est typé `version: number` alors que la spec attend le littéral 8.
+export const MAP_STYLE_LIGHT = mekanoLight as unknown as StyleSpecification;
+export const MAP_STYLE_DARK = mekanoDark as unknown as StyleSpecification;
 
 /** @deprecated utiliser mapStyleFor(mode) — conservé pour compat. */
-export const OSM_STYLE = mekanoLight;
+export const OSM_STYLE = MAP_STYLE_LIGHT;
 
 export function mapStyleFor(mode: 'light' | 'dark') {
   return mode === 'dark' ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;

@@ -104,6 +104,11 @@ const fr = {
   openingHours: 'Horaires',
   isOpen: 'Ouvert',
   photoCount: 'photos',
+  location: 'Position sur la carte',
+  searchAddress: 'Rechercher une adresse (ex. Analakely, Antananarivo)',
+  searchBtn: 'Chercher',
+  myPosition: 'Ma position',
+  mapHint: 'Clique sur la carte ou fais glisser l’épingle pour placer le garage précisément.',
 
   newAccount: 'Nouveau compte',
   garage: 'Garage',
@@ -277,6 +282,11 @@ const mg: Record<TKey, string> = {
   openingHours: 'Ora fiasana',
   isOpen: 'Misokatra',
   photoCount: 'sary',
+  location: 'Toerana eo amin’ny sarintany',
+  searchAddress: 'Hikaroka adiresy (ohatra: Analakely, Antananarivo)',
+  searchBtn: 'Tadiavo',
+  myPosition: 'Ny toerako',
+  mapHint: 'Tsindrio ny sarintany na afindrao ny tsimatra mba hametrahana tsara ny garazy.',
 
   newAccount: 'Kaonty vaovao',
   garage: 'Garazy',

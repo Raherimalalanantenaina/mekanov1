@@ -836,6 +836,55 @@ td.actions .btn {
   margin-top: 6px;
 }
 
+.map-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.map-box {
+  height: 320px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  z-index: 0;
+}
+
+.map-results {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.map-results button {
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+  text-align: left;
+  padding: 8px 11px;
+  font-size: 13px;
+}
+
+.map-results button:hover {
+  background: var(--teal-soft);
+}
+
+.map-pin {
+  background: none;
+  border: none;
+}
+
+.map-pin-head {
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--teal);
+  border: 3px solid #fff;
+  transform: rotate(-45deg);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
 @media (max-width: 900px) {
   .layout {
     flex-direction: column;

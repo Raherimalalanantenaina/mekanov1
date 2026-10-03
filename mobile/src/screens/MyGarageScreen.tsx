@@ -25,6 +25,7 @@ import {
   updateGarage,
 } from '../api/client';
 import { GarageCard } from '../components/GarageCard';
+import { LocationPicker, type Coords } from '../components/LocationPicker';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { BouncyPressable } from '../components/Pressable';
 import { StatsChart } from '../components/StatsChart';
@@ -88,6 +89,8 @@ export function MyGarageScreen() {
   } | null>(null);
   const [mobileService, setMobileService] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stats, setStats] = useState<DailyStat[]>([]);
 
@@ -106,6 +109,7 @@ export function MyGarageScreen() {
     setWeek(defaultWeek());
     setMobileService(false);
     setIsOpen(true);
+    setCoords(null);
   };
 
   const startEdit = (g: Garage) => {
@@ -125,6 +129,25 @@ export function MyGarageScreen() {
     setWeek(g.hoursJson?.length === 7 ? g.hoursJson : defaultWeek());
     setMobileService(!!g.mobileService);
     setIsOpen(g.isOpen);
+    setCoords({ latitude: g.latitude, longitude: g.longitude });
+  };
+
+  /** Position choisie sur la carte ; complète l'adresse et la ville si elles sont vides. */
+  const onLocationPicked = async (picked: Coords) => {
+    setCoords(picked);
+    setPickerOpen(false);
+    if (address.trim() && city.trim()) return;
+    try {
+      const [place] = await Location.reverseGeocodeAsync(picked);
+      if (!place) return;
+      const street = [place.streetNumber, place.street].filter(Boolean).join(' ');
+      const line = street || place.name || place.district || '';
+      if (!address.trim() && line) setAddress(line);
+      const town = place.city || place.subregion || '';
+      if (!city.trim() && town) setCity(town);
+    } catch {
+      // Géocodage inverse indisponible : l'utilisateur saisit l'adresse lui-même
+    }
   };
 
   const toggleService = (s: string) => {
@@ -258,6 +281,13 @@ export function MyGarageScreen() {
       Alert.alert(t('pickCategoryTitle'), t('pickCategoryText', { n: form.minCategories }));
       return;
     }
+    if (!coords) {
+      Alert.alert(t('locationTitle'), t('locationRequiredText'), [
+        { text: t('cancel'), style: 'cancel' },
+        { text: 'OK', onPress: () => setPickerOpen(true) },
+      ]);
+      return;
+    }
     setBusy(true);
     try {
       const payload = {
@@ -276,25 +306,19 @@ export function MyGarageScreen() {
         hoursJson: week,
         mobileService,
         isOpen,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
       };
       if (editing) {
         await updateGarage(editing.id, payload);
         Alert.alert(t('saved'), t('sheetUpdated'));
       } else {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        let latitude = -18.8792;
-        let longitude = 47.5079;
-        if (status === 'granted') {
-          const pos = await Location.getCurrentPositionAsync({});
-          latitude = pos.coords.latitude;
-          longitude = pos.coords.longitude;
+        const created = await createGarage(payload);
+        if (created.status === 'pending') {
+          Alert.alert(t('submittedTitle'), t('submittedText'));
+        } else {
+          Alert.alert(t('saved'), t('sheetUpdated'));
         }
-        await createGarage({
-          ...payload,
-          latitude,
-          longitude,
-        });
-        Alert.alert(t('submittedTitle'), t('submittedText'));
       }
       resetForm();
       await reload();
@@ -408,6 +432,25 @@ export function MyGarageScreen() {
               value={address}
               onChangeText={setAddress}
             />
+            <BouncyPressable
+              onPress={() => setPickerOpen(true)}
+              style={[styles.locationRow, !coords && styles.locationRowMissing]}
+            >
+              <Ionicons
+                name={coords ? 'checkmark-circle' : 'pin-outline'}
+                size={18}
+                color={coords ? colors.success : colors.teal}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationTitle}>{t('locationTitle')} *</Text>
+                <Text style={styles.locationSub}>
+                  {coords
+                    ? `${t('locationSet')} (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
+                    : t('locationNotSet')}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.faint} />
+            </BouncyPressable>
             {form.fields.city.visible && (
               <Input
                 icon="map-outline"
@@ -730,6 +773,12 @@ export function MyGarageScreen() {
         )}
       />
       </KeyboardAvoidingView>
+      <LocationPicker
+        visible={pickerOpen}
+        initial={coords}
+        onCancel={() => setPickerOpen(false)}
+        onConfirm={onLocationPicked}
+      />
     </View>
   );
 }
@@ -829,6 +878,21 @@ const createStyles = (colors: ThemeColors) =>
     marginBottom: 9,
   },
   inputText: { flex: 1, color: colors.ink, fontSize: 14 },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.field,
+    borderRadius: radii.sm,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    marginBottom: 9,
+  },
+  locationRowMissing: {
+    backgroundColor: colors.tealSoft,
+  },
+  locationTitle: { color: colors.ink, fontWeight: font.bold, fontSize: 13.5 },
+  locationSub: { color: colors.muted, fontSize: 12, marginTop: 1 },
   sectionLabel: {
     fontSize: 12.5,
     fontWeight: font.extrabold,

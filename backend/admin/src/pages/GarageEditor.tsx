@@ -4,6 +4,7 @@ import { useCatalog } from '../App';
 import { useI18n } from '../i18n';
 import type { GarageDetail, GarageStatus, PriceItem, UserItem } from '../types';
 import { Check, Field, Modal, useAction } from '../ui';
+import { MapPicker } from '../MapPicker';
 
 type Draft = {
   name: string;
@@ -253,6 +254,17 @@ export function GarageEditor({
         <Field label={`${t('longitude')} *`}>
           <input value={draft.longitude} onChange={(e) => set('longitude', e.target.value)} />
         </Field>
+      </div>
+
+      <div>
+        <div className="field-label" style={{ marginBottom: 8 }}>
+          {t('location')} *
+        </div>
+        <MapPicker
+          latitude={Number(draft.latitude) || -18.8792}
+          longitude={Number(draft.longitude) || 47.5079}
+          onChange={(lat, lng) => setDraft((d) => (d ? { ...d, latitude: lat.toFixed(6), longitude: lng.toFixed(6) } : d))}
+        />
       </div>
 
       <Field label={t('description')}>
