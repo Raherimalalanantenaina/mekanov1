@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   Tabs: undefined;
-  GarageDetail: { id: string };
+  /** `review` : ouvre directement le formulaire d'avis (prérempli avec `reviewName`) */
+  GarageDetail: { id: string; review?: boolean; reviewName?: string };
   Route: {
     garageId: string;
     name: string;

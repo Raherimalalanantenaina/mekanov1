@@ -19,6 +19,9 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
   const [busy, setBusy] = useState(false);
 
   const current: PlanId = garage.plan ?? 'free';
+  const daysLeft = garage.planExpiresAt
+    ? Math.ceil((new Date(garage.planExpiresAt).getTime() - Date.now()) / 86_400_000)
+    : null;
   const price = (id: PlanId) =>
     config.plans[id].price > 0
       ? `${config.plans[id].price.toLocaleString('fr-FR')} ${t('perMonth')}`
@@ -78,6 +81,12 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
           )}
         </View>
       </View>
+      {current !== 'free' && daysLeft != null && daysLeft <= 7 && (
+        <View style={styles.pendingBox}>
+          <Ionicons name="alarm-outline" size={15} color={colors.amberDark} />
+          <Text style={styles.pendingText}>{t('planEndsSoon', { n: Math.max(daysLeft, 0) })}</Text>
+        </View>
+      )}
       {garage.planRequest && (
         <View style={styles.pendingBox}>
           <Ionicons name="hourglass-outline" size={15} color={colors.amberDark} />
@@ -120,7 +129,15 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
                 </Text>
               </View>
             ))}
-            {isCurrent ? (
+            {isCurrent && id !== 'free' && !isRequested && daysLeft != null && daysLeft <= 7 ? (
+              <BouncyPressable
+                onPress={() => onRequest(id)}
+                disabled={busy}
+                style={[styles.btn, busy && { opacity: 0.6 }]}
+              >
+                <Text style={styles.btnText}>{t('planRenew')}</Text>
+              </BouncyPressable>
+            ) : isCurrent ? (
               <View style={[styles.btn, styles.btnCurrent]}>
                 <Text style={[styles.btnText, { color: colors.teal }]}>{t('currentPlan')}</Text>
               </View>

@@ -151,6 +151,10 @@ ALTER TABLE garages ALTER COLUMN plan SET DEFAULT 'free';
 ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ;
 ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_request TEXT;
 ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_requested_at TIMESTAMPTZ;
+-- Échéance des offres : rappel envoyé (pour quelle date) et dernière expiration
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_reminded_for TIMESTAMPTZ;
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_expired_at TIMESTAMPTZ;
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_expired_from TEXT;
 
 -- Configuration de l'app (clé 'app' = JSON de config, clé 'logo' = data URL)
 CREATE TABLE IF NOT EXISTS app_settings (

@@ -14,6 +14,8 @@ import configRoutes from './routes/config';
 import superAdminRoutes from './routes/superadmin';
 import syncRoutes from './routes/sync';
 import { loadCatalog } from './serviceCatalog';
+import { attachRealtime, realtimeMiddleware } from './realtime';
+import { startPlanJobs } from './planJobs';
 
 const app = express();
 
@@ -28,6 +30,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'mekano-api', mode: 'online' });
 });
 
+app.use('/api', realtimeMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/garages', garageRoutes);
 app.use('/api/quotes', quoteRoutes);
@@ -65,7 +68,9 @@ app.use(
 loadCatalog()
   .catch((err) => console.error('Chargement du catalogue échoué :', err))
   .finally(() => {
-    app.listen(config.port, () => {
+    const server = app.listen(config.port, () => {
       console.log(`Mekano API sur http://localhost:${config.port}`);
     });
+    attachRealtime(server);
+    startPlanJobs();
   });

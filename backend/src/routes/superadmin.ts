@@ -163,12 +163,31 @@ router.get(
          FROM users u LEFT JOIN garages g ON g.owner_id = u.id
         WHERE u.status = 'pending' AND g.id IS NULL)
       UNION ALL
+      (SELECT 'plan_expiring', g.id, g.name, g.plan || '|' || g.plan_expires_at::text, g.plan_expires_at - INTERVAL '7 days'
+         FROM garages g
+        WHERE g.plan <> 'free' AND g.plan_expires_at > NOW()
+          AND g.plan_expires_at < NOW() + INTERVAL '7 days')
+      UNION ALL
+      (SELECT 'plan_expired', g.id, g.name, g.plan_expired_from, g.plan_expired_at
+         FROM garages g
+        WHERE g.plan = 'free' AND g.plan_expired_at > NOW() - INTERVAL '7 days')
+      UNION ALL
       (SELECT 'review', r.id, g.name, r.author_name || ' · ' || r.rating || '/5', r.created_at
          FROM reviews r JOIN garages g ON g.id = r.garage_id
         WHERE r.created_at > NOW() - INTERVAL '7 days')
       ORDER BY at DESC
       LIMIT 50
     `);
+    const { plans } = (await getConfig()).config;
+    const planName = (id: string) => plans[id as keyof typeof plans]?.name.fr ?? id;
+    for (const r of rows) {
+      if (r.kind === 'plan_expiring' && r.detail) {
+        const [plan, until] = r.detail.split('|');
+        r.detail = `${planName(plan)} · ${new Date(until).toLocaleDateString('fr-FR')}`;
+      } else if (r.kind === 'plan_expired' && r.detail) {
+        r.detail = planName(r.detail);
+      }
+    }
     return res.json(rows);
   })
 );
@@ -442,6 +461,11 @@ router.get(
     if (isPlanId(plan)) {
       params.push(plan);
       where.push(`${effectivePlanSql('g')} = $${params.length}`);
+    } else if (plan === 'expiring') {
+      where.push(
+        `((g.plan <> 'free' AND g.plan_expires_at < NOW() + INTERVAL '7 days')
+          OR (g.plan = 'free' AND g.plan_expired_at > NOW() - INTERVAL '7 days'))`
+      );
     }
     if (req.query.planRequest === '1') where.push(`g.plan_request IS NOT NULL`);
     const { rows } = await query<{
@@ -467,10 +491,13 @@ router.get(
       plan_expires_at: string | null;
       plan_request: string | null;
       plan_requested_at: string | null;
+      plan_expired_from: string | null;
+      plan_expired_at: string | null;
     }>(
       `SELECT g.id, g.owner_id, g.name, g.address, g.city, g.phone, g.categories,
               g.services, g.status, g.is_open, g.views, g.calls, g.created_at,
               g.plan, g.plan_expires_at, g.plan_request, g.plan_requested_at,
+              g.plan_expired_from, g.plan_expired_at,
               cardinality(g.photos) AS photo_count,
               u.email AS owner_email, u.full_name AS owner_name, u.status AS owner_status,
               (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM reviews r WHERE r.garage_id = g.id) AS rating
@@ -530,14 +557,18 @@ function planInfo(r: {
   plan_expires_at: string | null;
   plan_request: string | null;
   plan_requested_at: string | null;
+  plan_expired_from?: string | null;
+  plan_expired_at?: string | null;
 }) {
   const expired = !!r.plan_expires_at && new Date(r.plan_expires_at).getTime() < Date.now();
+  // Offre repassée en gratuit par l'échéance automatique
+  const lapsed = r.plan === 'free' && isPlanId(r.plan_expired_from) && r.plan_expired_from !== 'free';
   return {
     plan: isPlanId(r.plan) && !expired ? r.plan : 'free',
     /** Offre enregistrée (même expirée), pour la renouveler facilement */
-    paidPlan: isPlanId(r.plan) ? r.plan : 'free',
-    planExpiresAt: r.plan_expires_at,
-    planExpired: expired,
+    paidPlan: lapsed ? r.plan_expired_from! : isPlanId(r.plan) ? r.plan : 'free',
+    planExpiresAt: r.plan_expires_at ?? (lapsed ? r.plan_expired_at ?? null : null),
+    planExpired: expired || lapsed,
     planRequest: isPlanId(r.plan_request) ? r.plan_request : null,
     planRequestedAt: r.plan_requested_at,
   };

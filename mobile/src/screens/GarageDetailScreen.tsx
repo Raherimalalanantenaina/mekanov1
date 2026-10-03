@@ -40,6 +40,7 @@ import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage, Review } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 import { notify } from '../components/Notifier';
+import { PhotoViewer } from '../components/PhotoViewer';
 import { useSync } from '../sync';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GarageDetail'>;
@@ -80,6 +81,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
 
   const [garage, setGarage] = useState<Garage | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [isFav, setIsFav] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,6 +125,16 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Erreur'));
   }, [id]);
+
+  const wantsReview = route.params.review;
+  const reviewName = route.params.reviewName;
+  const reviewsOn = !!garage && config.features.reviews && garageFeatures(garage).reviews;
+  useEffect(() => {
+    if (!wantsReview || !reviewsOn) return;
+    if (reviewName) setRName((n) => n || reviewName);
+    setShowReview(true);
+    navigation.setParams({ review: undefined });
+  }, [wantsReview, reviewsOn, reviewName, navigation]);
 
   useSync(['garages'], () => {
     fetchGarageById(id).then(setGarage).catch(() => {});
@@ -176,9 +188,12 @@ export function GarageDetailScreen({ route, navigation }: Props) {
 
   const onShare = async () => {
     await Share.share({
-      message: `${garage.name} — ${garage.address}, ${garage.city}${
-        phone ? ` · ${phone}` : ''
-      }\nTrouvé sur Mekano`,
+      message: t('shareText', {
+        name: garage.name,
+        address: [garage.address, garage.city].filter(Boolean).join(', '),
+        phone: phone ? `Tél. ${phone}` : '',
+        map: `https://www.google.com/maps/search/?api=1&query=${garage.latitude},${garage.longitude}`,
+      }).replace(/\n\n\n/, '\n\n'),
     });
   };
 
@@ -357,14 +372,23 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             contentContainerStyle={{ gap: 10 }}
           >
             {garage.photos.map((uri, i) => (
-              <Image
-                key={i}
-                source={{ uri }}
-                style={[styles.photo, { width: width * 0.62 }]}
-                resizeMode="cover"
-              />
+              <BouncyPressable key={i} onPress={() => setViewerIndex(i)}>
+                <Image
+                  source={{ uri }}
+                  style={[styles.photo, { width: width * 0.62 }]}
+                  resizeMode="cover"
+                />
+              </BouncyPressable>
             ))}
           </ScrollView>
+        )}
+        {features.photos && garage.photos?.length > 0 && (
+          <PhotoViewer
+            photos={garage.photos}
+            index={viewerIndex}
+            onClose={() => setViewerIndex(null)}
+            title={garage.name}
+          />
         )}
 
         {garage.description ? (

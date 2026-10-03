@@ -35,10 +35,10 @@ export function MapPicker({ latitude, longitude, onChange }: Props) {
   useEffect(() => {
     if (!container.current || map.current) return;
     const m = L.map(container.current).setView([latitude, longitude], 16);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20,
-      subdomains: 'abcd',
-      attribution: '© OpenStreetMap © CARTO',
+    // Tuiles OpenStreetMap publiques : gratuites, sans clé API
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap',
     }).addTo(m);
     const mk = L.marker([latitude, longitude], { draggable: true, icon: pinIcon }).addTo(m);
     mk.on('dragend', () => {

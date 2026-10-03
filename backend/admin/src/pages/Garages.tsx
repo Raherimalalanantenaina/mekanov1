@@ -7,6 +7,8 @@ import {
   mdiCheckDecagramOutline,
   mdiCloseCircleOutline,
   mdiCrownOutline,
+  mdiAutorenew,
+  mdiTimerAlertOutline,
   mdiEyeOffOutline,
   mdiEyeOutline,
   mdiGarageVariant,
@@ -245,6 +247,7 @@ export function Garages() {
                 {t('plan')}: {t('all')}
               </option>
               <option value="request">{t('planRequests')}</option>
+              <option value="expiring">{t('planExpiringFilter')}</option>
               {PLAN_IDS.map((id) => (
                 <option key={id} value={id}>
                   {planName(id)}
@@ -335,13 +338,35 @@ export function Garages() {
                     </td>
                     <td>
                       <PlanBadge plan={g.plan} name={planName(g.plan)} />
-                      {g.planExpiresAt && g.paidPlan !== 'free' && (
-                        <div className="sub" style={{ marginTop: 3 }}>
-                          {g.planExpired
-                            ? `${planName(g.paidPlan)} · ${t('planExpired')}`
-                            : t('planUntil', { d: formatDay(g.planExpiresAt, lang) })}
-                        </div>
-                      )}
+                      {g.planExpiresAt && g.paidPlan !== 'free' && (() => {
+                        const days = Math.ceil((new Date(g.planExpiresAt).getTime() - Date.now()) / 86_400_000);
+                        const soon = !g.planExpired && days <= 7;
+                        return (
+                          <div>
+                            <div className="sub" style={{ marginTop: 3 }}>
+                              {g.planExpired
+                                ? `${planName(g.paidPlan)} · ${t('planExpired')}`
+                                : t('planUntil', { d: formatDay(g.planExpiresAt, lang) })}
+                            </div>
+                            {soon && (
+                              <div className="plan-warn">
+                                <MdiIcon path={mdiTimerAlertOutline} size={13} />
+                                {t('planEndsIn', { n: Math.max(days, 0) })}
+                              </div>
+                            )}
+                            {(soon || g.planExpired) && !g.planRequest && (
+                              <div className="actions-group" style={{ marginTop: 4 }}>
+                                <IconButton
+                                  icon={mdiAutorenew}
+                                  tone="success"
+                                  label={t('planRenew', { p: planName(g.paidPlan) })}
+                                  onClick={() => activatePlan(g, g.paidPlan)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {g.planRequest && (
                         <div>
                           <div className="plan-request">

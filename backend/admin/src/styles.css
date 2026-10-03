@@ -677,6 +677,8 @@ button {
 .kind-registration { background: var(--teal-soft); color: var(--teal); }
 .kind-plan_request { background: var(--amber-soft); color: #b26a00; }
 .kind-account { background: var(--info-soft); color: var(--info); }
+.kind-plan_expiring { background: var(--amber-soft); color: #b26a00; }
+.kind-plan_expired { background: #fdecec; color: #c62828; }
 .kind-review { background: #fdf2e0; color: #d48806; }
 
 .notif-body {
@@ -2157,4 +2159,18 @@ td.actions .btn {
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 14px -4px rgba(18, 113, 122, 0.5);
+}
+
+.plan-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b26a00;
+}
+
+.plan-warn.expired {
+  color: #c62828;
 }

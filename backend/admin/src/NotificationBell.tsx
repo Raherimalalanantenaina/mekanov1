@@ -5,6 +5,8 @@ import {
   mdiBellRingOutline,
   mdiCheckAll,
   mdiCrownOutline,
+  mdiTimerAlertOutline,
+  mdiTimerOffOutline,
   mdiStarOutline,
   mdiStorePlusOutline,
 } from '@mdi/js';
@@ -13,12 +15,14 @@ import { useI18n, type TKey } from './i18n';
 import { MdiIcon } from './CategoryIcon';
 import { timeAgo, useToast } from './ui';
 
-type Kind = 'registration' | 'plan_request' | 'account' | 'review';
+type Kind = 'registration' | 'plan_request' | 'plan_expiring' | 'plan_expired' | 'account' | 'review';
 type Item = { kind: Kind; id: string; title: string; detail: string | null; at: string };
 
 const KIND_ICON: Record<Kind, string> = {
   registration: mdiStorePlusOutline,
   plan_request: mdiCrownOutline,
+  plan_expiring: mdiTimerAlertOutline,
+  plan_expired: mdiTimerOffOutline,
   account: mdiAccountClockOutline,
   review: mdiStarOutline,
 };
@@ -26,6 +30,8 @@ const KIND_ICON: Record<Kind, string> = {
 const KIND_LINK: Record<Kind, string> = {
   registration: '#/garages?status=pending',
   plan_request: '#/garages?plan=request',
+  plan_expiring: '#/garages?plan=expiring',
+  plan_expired: '#/garages?plan=expiring',
   account: '#/garages?tab=accounts',
   review: '#/moderation',
 };
@@ -76,6 +82,35 @@ export function NotificationBell({ onChange }: { onChange: () => void }) {
       window.removeEventListener('focus', onFocus);
     };
   }, [load]);
+
+  // Temps réel : le serveur signale chaque modification, on recharge aussitôt
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+    const connect = () => {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}/api/ws`);
+      ws.onmessage = (e) => {
+        try {
+          if (JSON.parse(e.data).type === 'sync') loadRef.current();
+        } catch {
+          /* message inconnu */
+        }
+      };
+      ws.onclose = () => {
+        if (!closed) retry = setTimeout(connect, 5000);
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;

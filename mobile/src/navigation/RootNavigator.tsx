@@ -1,5 +1,5 @@
 import React from 'react';
-import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,10 +15,12 @@ import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
 import { useAppConfig } from '../appConfig';
 import { font } from '../theme';
+import { ReviewPrompter } from '../components/ReviewPrompter';
 import type { RootStackParamList } from './types';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function MainTabs() {
   const { t } = useI18n();
@@ -115,7 +117,7 @@ export function RootNavigator() {
     [colors]
   );
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs" component={MainTabs} />
         <Stack.Screen
@@ -129,6 +131,7 @@ export function RootNavigator() {
           options={{ animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>
+      <ReviewPrompter navigation={navigationRef} />
     </NavigationContainer>
   );
 }

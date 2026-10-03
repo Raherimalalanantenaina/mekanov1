@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { BouncyPressable } from './Pressable';
+import { PhotoViewer } from './PhotoViewer';
 import { CategoryIcon } from './CategoryIcon';
 import { useTheme } from '../context/ThemeContext';
 import { isOpenNow } from '../hours';
@@ -17,9 +18,6 @@ type Props = {
   onPress: () => void;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
-  /** Boutons rapides (affichés seulement si l'offre du garage les inclut) */
-  onCall?: () => void;
-  onRoute?: () => void;
   index?: number;
 };
 
@@ -28,8 +26,6 @@ export function GarageCard({
   onPress,
   isFavorite,
   onToggleFavorite,
-  onCall,
-  onRoute,
   index = 0,
 }: Props) {
   const { colors } = useTheme();
@@ -43,8 +39,8 @@ export function GarageCard({
   const open = isOpenNow(garage);
   const showRating = config.features.reviews && pf.reviews && garage.rating != null;
   const featured = pf.boost && !!garage.plan && garage.plan !== 'free';
-  const canCall = !!onCall && pf.phone && !!garage.phone;
-  const canRoute = !!onRoute && pf.route;
+  const photos = pf.photos ? garage.photos ?? [] : [];
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   return (
     <Animated.View entering={FadeInDown.duration(300).delay(Math.min(index, 6) * 40)}>
@@ -52,7 +48,15 @@ export function GarageCard({
         <View style={styles.main}>
           <View>
             {photo ? (
-              <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+              <BouncyPressable onPress={() => setViewerIndex(0)}>
+                <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+                {photos.length > 1 && (
+                  <View style={styles.photoCount}>
+                    <Ionicons name="images" size={10} color="#fff" />
+                    <Text style={styles.photoCountText}>{photos.length}</Text>
+                  </View>
+                )}
+              </BouncyPressable>
             ) : (
               <View style={[styles.photo, styles.photoPlaceholder]}>
                 <CategoryIcon category={category} size={34} color={colors.teal} />
@@ -134,26 +138,13 @@ export function GarageCard({
           </View>
         </View>
 
-        {(canCall || canRoute) && (
-          <View style={styles.actions}>
-            {canCall && (
-              <BouncyPressable onPress={onCall!} style={[styles.action, styles.actionPrimary]}>
-                <Ionicons name="call" size={14} color={colors.white} />
-                <Text style={[styles.actionText, { color: colors.white }]}>{t('call')}</Text>
-              </BouncyPressable>
-            )}
-            {canRoute && (
-              <BouncyPressable onPress={onRoute!} style={styles.action}>
-                <Ionicons name="navigate" size={14} color={colors.teal} />
-                <Text style={styles.actionText}>{t('routeShort')}</Text>
-              </BouncyPressable>
-            )}
-            <BouncyPressable onPress={onPress} style={styles.actionIcon}>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </BouncyPressable>
-          </View>
-        )}
       </BouncyPressable>
+      <PhotoViewer
+        photos={photos}
+        index={viewerIndex}
+        onClose={() => setViewerIndex(null)}
+        title={garage.name}
+      />
     </Animated.View>
   );
 }
@@ -198,6 +189,19 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    photoCount: {
+      position: 'absolute',
+      right: 5,
+      bottom: 5,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      borderRadius: radii.pill,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    photoCountText: { color: '#fff', fontSize: 10, fontWeight: font.bold },
     featuredTag: {
       position: 'absolute',
       top: 6,
@@ -244,33 +248,5 @@ const createStyles = (colors: ThemeColors) =>
       maxWidth: '100%',
     },
     tagText: { fontSize: 10.5, fontWeight: font.bold, color: colors.teal, flexShrink: 1 },
-    actions: {
-      flexDirection: 'row',
-      gap: 8,
-      marginTop: 12,
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.line,
-    },
-    action: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      height: 38,
-      borderRadius: radii.sm,
-      backgroundColor: colors.tealSoft,
-    },
-    actionPrimary: { backgroundColor: colors.teal },
-    actionText: { fontSize: 13, fontWeight: font.extrabold, color: colors.teal },
-    actionIcon: {
-      width: 38,
-      height: 38,
-      borderRadius: radii.sm,
-      backgroundColor: colors.field,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     skel: { height: 10, borderRadius: 5, backgroundColor: colors.field },
   });
