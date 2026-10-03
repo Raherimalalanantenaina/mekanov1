@@ -239,24 +239,50 @@ function categoryOfService(service: string, cats: ServiceCategory[]): string | n
   return byKeyword?.id ?? null;
 }
 
-/** Ids de catégories valides = choix explicites + catégories déduites des services. */
+/**
+ * Type de service d'un garage (un seul) : le premier choix explicite valide,
+ * sinon le type le plus représenté parmi ses services. Renvoie [] ou [id].
+ */
 export function resolveCategories(explicit: unknown, services: unknown): string[] {
   const cats = catalog;
   const known = new Set(cats.map((c) => c.id));
-  const ids = new Set<string>();
   if (Array.isArray(explicit)) {
-    for (const id of explicit) {
-      if (typeof id === 'string' && known.has(id)) ids.add(id);
-    }
+    const chosen = explicit.find((id): id is string => typeof id === 'string' && known.has(id));
+    if (chosen) return [chosen];
   }
+  const counts = new Map<string, number>();
   if (Array.isArray(services)) {
     for (const s of services) {
       if (typeof s !== 'string') continue;
       const id = categoryOfService(s, cats);
-      if (id) ids.add(id);
+      if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
     }
   }
-  return cats.filter((c) => ids.has(c.id)).map((c) => c.id);
+  let best: string | null = null;
+  for (const c of cats) {
+    const n = counts.get(c.id) ?? 0;
+    if (n > 0 && (best === null || n > (counts.get(best) ?? 0))) best = c.id;
+  }
+  return best ? [best] : [];
+}
+
+/** Retire les sous-types appartenant à un autre type que celui du garage (le texte libre reste). */
+export function servicesForCategory(categoryIds: string[], services: unknown): string[] {
+  if (!Array.isArray(services)) return [];
+  const own = new Set(
+    catalog
+      .filter((c) => categoryIds.includes(c.id))
+      .flatMap((c) => c.subtypes.map((s) => normalize(s.label)))
+  );
+  const foreign = new Set(
+    catalog
+      .filter((c) => !categoryIds.includes(c.id))
+      .flatMap((c) => c.subtypes.map((s) => normalize(s.label)))
+  );
+  return services.filter(
+    (s): s is string =>
+      typeof s === 'string' && (own.has(normalize(s)) || !foreign.has(normalize(s)))
+  );
 }
 
 /** Catégories correspondant à un texte de recherche (libellé, sous-type ou mot-clé). */

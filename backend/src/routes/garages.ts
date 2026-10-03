@@ -9,6 +9,7 @@ import {
   categoryLabel,
   matchingCategoryIds,
   resolveCategories,
+  servicesForCategory,
 } from '../serviceCatalog';
 
 /** Horaires d'une journée : { open: 'HH:MM', close: 'HH:MM', closed: bool } */
@@ -99,7 +100,7 @@ export function checkGarageForm(
     return `${appConfig.garageForm.maxPhotos} photos maximum`;
   }
   if (g.categories.length < appConfig.garageForm.minCategories) {
-    return 'Choisis au moins un type de service';
+    return 'Choisis le type de service du garage';
   }
   return null;
 }
@@ -335,7 +336,7 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
     latitude,
     longitude,
     categories: rawCategories = [],
-    services = [],
+    services: rawServices = [],
     photos = [],
     mobileService = false,
     promo = '',
@@ -376,7 +377,8 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
   }
 
   const { config: appConfig } = await getConfig();
-  const categories = resolveCategories(rawCategories, services);
+  const categories = resolveCategories(rawCategories, rawServices);
+  const services = servicesForCategory(categories, rawServices);
   const formError = checkGarageForm(appConfig, {
     phone,
     city,
@@ -426,8 +428,8 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
       Garage: name,
       Adresse: `${address}${city ? `, ${city}` : ''}`,
       'Téléphone': phone || '—',
-      'Types de service': categories.map(categoryLabel).join(', ') || '—',
-      Services: (services as string[]).join(', ') || '—',
+      'Type de service': categories.map(categoryLabel).join(', ') || '—',
+      'Sous-types': services.join(', ') || '—',
       'Propriétaire': `${owner.rows[0].full_name} (${owner.rows[0].email})`,
     },
     approveUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/approve`,
@@ -451,11 +453,11 @@ router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
 
   const g = existing.rows[0];
   const b = req.body;
-  const services = b.services ?? g.services;
   const categories =
     b.categories !== undefined || b.services !== undefined
-      ? resolveCategories(b.categories ?? g.categories, services)
+      ? resolveCategories(b.categories ?? g.categories, b.services ?? g.services)
       : g.categories;
+  const services = servicesForCategory(categories, b.services ?? g.services);
 
   const { rows } = await query<GarageRow>(
     `UPDATE garages SET

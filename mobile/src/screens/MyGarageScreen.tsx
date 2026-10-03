@@ -156,17 +156,13 @@ export function MyGarageScreen() {
     );
   };
 
-  /** Désélectionner un type retire aussi ses sous-types. */
-  const toggleCategory = (id: string) => {
-    const subs = new Set(
-      catalog.find((c) => c.id === id)?.subtypes.map((s) => s.label)
+  /** Un garage = un seul type : changer de type retire les sous-types de l'ancien. */
+  const selectCategory = (id: string) => {
+    const allSubs = new Set(
+      catalog.flatMap((c) => c.subtypes.map((s) => s.label))
     );
-    if (categories.includes(id)) {
-      setCategories((prev) => prev.filter((x) => x !== id));
-      setServices((prev) => prev.filter((s) => !subs.has(s)));
-    } else {
-      setCategories((prev) => [...prev, id]);
-    }
+    setServices((prev) => prev.filter((s) => !allSubs.has(s)));
+    setCategories((prev) => (prev[0] === id ? [] : [id]));
   };
 
   const catalogSubtypes = new Set(
@@ -555,13 +551,13 @@ export function MyGarageScreen() {
                     style={[styles.categoryBlock, i > 0 && styles.hoursRowBorder]}
                   >
                     <BouncyPressable
-                      onPress={() => toggleCategory(c.id)}
+                      onPress={() => selectCategory(c.id)}
                       style={styles.categoryRow}
                     >
-                      <View style={[styles.dayToggle, catOn && styles.dayToggleOn]}>
-                        {catOn && (
-                          <Ionicons name="checkmark" size={13} color={colors.white} />
-                        )}
+                      <View
+                        style={[styles.dayToggle, styles.radio, catOn && styles.dayToggleOn]}
+                      >
+                        {catOn && <View style={styles.radioDot} />}
                       </View>
                       <Text style={styles.categoryText}>
                         {c.emoji} {localized(c, lang)}
@@ -892,6 +888,8 @@ const createStyles = (colors: ThemeColors) =>
     backgroundColor: colors.tealSoft,
   },
   locationTitle: { color: colors.ink, fontWeight: font.bold, fontSize: 13.5 },
+  radio: { borderRadius: 999 },
+  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.white },
   locationSub: { color: colors.muted, fontSize: 12, marginTop: 1 },
   sectionLabel: {
     fontSize: 12.5,

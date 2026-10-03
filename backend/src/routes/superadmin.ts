@@ -11,6 +11,7 @@ import {
   loadCatalog,
   normalize,
   resolveCategories,
+  servicesForCategory,
   slugify,
 } from '../serviceCatalog';
 import { pushBroadcast, pushToUser } from '../push';
@@ -519,7 +520,8 @@ router.post(
     if (Number(existing.rows[0].count) >= 1) {
       return res.status(409).json({ error: 'Ce compte a déjà un garage (1 compte = 1 garage)' });
     }
-    const services: string[] = Array.isArray(b.services) ? b.services : [];
+    const categories = resolveCategories(b.categories, b.services);
+    const services = servicesForCategory(categories, b.services);
     const { rows } = await query<GarageRow>(
       `INSERT INTO garages
         (owner_id, name, description, address, city, phone, latitude, longitude,
@@ -537,7 +539,7 @@ router.post(
         Number(b.latitude),
         Number(b.longitude),
         services,
-        resolveCategories(b.categories, services),
+        categories,
         Array.isArray(b.photos) ? b.photos : [],
         Boolean(b.mobileService),
         b.promo ?? '',
@@ -589,7 +591,7 @@ router.put(
     const sets: string[] = [];
     const params: unknown[] = [];
     for (const [key, column] of Object.entries(GARAGE_FIELDS)) {
-      if (b[key] === undefined) continue;
+      if (b[key] === undefined || key === 'services') continue;
       let value = b[key];
       if (key === 'priceList' || key === 'hoursJson') {
         value = value == null ? null : JSON.stringify(value);
@@ -598,8 +600,11 @@ router.put(
       sets.push(`${column} = $${params.length}`);
     }
     if (b.categories !== undefined || b.services !== undefined) {
-      params.push(resolveCategories(b.categories ?? g.categories, b.services ?? g.services));
+      const categories = resolveCategories(b.categories ?? g.categories, b.services ?? g.services);
+      params.push(categories);
       sets.push(`categories = $${params.length}`);
+      params.push(servicesForCategory(categories, b.services ?? g.services));
+      sets.push(`services = $${params.length}`);
     }
     if (b.status && b.status !== 'pending') sets.push(`approval_token = NULL`);
     if (!sets.length) return res.json(mapGarage(g));

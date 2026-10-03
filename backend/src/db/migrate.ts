@@ -163,12 +163,15 @@ async function migrate() {
 
   await seedCatalogIfEmpty();
   await loadCatalog();
-  // Classe les garages existants à partir de leurs anciens services
-  const { rows } = await pool.query<{ id: string; services: string[] }>(
-    `SELECT id, services FROM garages WHERE categories = '{}'`
+  // Un seul type par garage : classe les garages sans type à partir de leurs
+  // services, et réduit à un type ceux qui en ont plusieurs
+  const { rows } = await pool.query<{ id: string; services: string[]; categories: string[] }>(
+    `SELECT id, services, categories FROM garages
+     WHERE categories = '{}' OR cardinality(categories) > 1`
   );
   for (const row of rows) {
-    const categories = resolveCategories([], row.services);
+    const fromServices = resolveCategories([], row.services);
+    const categories = fromServices.length ? fromServices : row.categories.slice(0, 1);
     if (categories.length) {
       await pool.query(`UPDATE garages SET categories = $2 WHERE id = $1`, [
         row.id,

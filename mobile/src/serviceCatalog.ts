@@ -107,14 +107,19 @@ function categoryOfService(service: string): string | null {
   return byKeyword?.id ?? null;
 }
 
-/** Catégories déduites des services (garages créés avant les types). */
+/** Type déduit des services (garages créés avant les types) : le plus représenté. */
 export function resolveCategories(services: string[]): string[] {
-  const ids = new Set<string>();
+  const counts = new Map<string, number>();
   for (const s of services) {
     const id = categoryOfService(s);
-    if (id) ids.add(id);
+    if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
-  return catalog.filter((c) => ids.has(c.id)).map((c) => c.id);
+  let best: string | null = null;
+  for (const c of catalog) {
+    const n = counts.get(c.id) ?? 0;
+    if (n > 0 && (best === null || n > (counts.get(best) ?? 0))) best = c.id;
+  }
+  return best ? [best] : [];
 }
 
 /** Catégories correspondant à un texte de recherche (libellé, sous-type ou mot-clé). */
@@ -147,10 +152,10 @@ type GarageLike = {
   services: string[];
 };
 
-/** Types connus d'un garage (repli sur les services pour les anciennes fiches). */
+/** Type d'un garage, un seul (repli sur les services pour les anciennes fiches). */
 export function garageCategoryIds(g: GarageLike): string[] {
   const known = new Set(catalog.map((c) => c.id));
-  const ids = (g.categories ?? []).filter((id) => known.has(id));
+  const ids = (g.categories ?? []).filter((id) => known.has(id)).slice(0, 1);
   return ids.length ? ids : resolveCategories(g.services);
 }
 

@@ -80,7 +80,7 @@ export function GarageEditor({
           phone: g.phone ?? '',
           latitude: String(g.latitude),
           longitude: String(g.longitude),
-          categories: g.categories,
+          categories: g.categories.slice(0, 1),
           services: g.services.filter((s) => subtypeLabels.has(s)),
           other: g.services.filter((s) => !subtypeLabels.has(s)).join(', '),
           photos: g.photos,
@@ -108,19 +108,9 @@ export function GarageEditor({
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value });
 
-  const toggleCategory = (catId: string) => {
-    const has = draft.categories.includes(catId);
-    if (has) {
-      const removed = new Set(catalog.find((c) => c.id === catId)?.subtypes.map((s) => s.label));
-      setDraft({
-        ...draft,
-        categories: draft.categories.filter((c) => c !== catId),
-        services: draft.services.filter((s) => !removed.has(s)),
-      });
-    } else {
-      setDraft({ ...draft, categories: [...draft.categories, catId] });
-    }
-  };
+  /** Un garage = un seul type : changer de type vide les sous-types choisis. */
+  const selectCategory = (catId: string) =>
+    setDraft({ ...draft, categories: [catId], services: [] });
 
   const toggleService = (label: string) =>
     set('services', draft.services.includes(label) ? draft.services.filter((s) => s !== label) : [...draft.services, label]);
@@ -279,7 +269,16 @@ export function GarageEditor({
           const on = draft.categories.includes(c.id);
           return (
             <div key={c.id} style={{ marginBottom: 6 }}>
-              <Check checked={on} onChange={() => toggleCategory(c.id)} label={`${c.emoji} ${(lang === 'mg' && c.labelMg) || c.label}`} />
+              <label className="row" style={{ cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="garage-category"
+                  style={{ width: 'auto' }}
+                  checked={on}
+                  onChange={() => selectCategory(c.id)}
+                />
+                {c.emoji} {(lang === 'mg' && c.labelMg) || c.label}
+              </label>
               {on && (
                 <div style={{ paddingLeft: 46, marginTop: 4 }}>
                   {c.subtypes.map((s) => (

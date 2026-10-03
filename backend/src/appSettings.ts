@@ -130,7 +130,7 @@ export function sanitizeConfig(input: unknown, base: AppConfig = DEFAULT_CONFIG)
           ? Math.round(maxPhotos)
           : base.garageForm.maxPhotos,
       minCategories:
-        Number.isFinite(minCategories) && minCategories >= 0 && minCategories <= 5
+        Number.isFinite(minCategories) && minCategories >= 0 && minCategories <= 1
           ? Math.round(minCategories)
           : base.garageForm.minCategories,
       fields: Object.fromEntries(

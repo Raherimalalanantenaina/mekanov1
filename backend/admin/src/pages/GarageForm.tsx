@@ -34,15 +34,13 @@ export function GarageForm() {
               onChange={(e) => setForm({ maxPhotos: Math.max(1, Math.min(30, Number(e.target.value) || 1)) })}
             />
           </Field>
-          <Field label={t('minCategories')} hint="0 – 5">
-            <input
-              type="number"
-              min={0}
-              max={5}
-              value={form.minCategories}
-              onChange={(e) => setForm({ minCategories: Math.max(0, Math.min(5, Number(e.target.value) || 0)) })}
+          <div style={{ paddingTop: 24 }}>
+            <Check
+              checked={form.minCategories > 0}
+              label={t('minCategories')}
+              onChange={(v) => setForm({ minCategories: v ? 1 : 0 })}
             />
-          </Field>
+          </div>
         </div>
       </div>
 

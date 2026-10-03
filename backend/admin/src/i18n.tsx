@@ -60,7 +60,7 @@ const fr = {
   devices: 'Appareils (push)',
   last14Days: '14 derniers jours',
   topGarages: 'Garages les plus vus',
-  garagesByType: 'Garages validés par type',
+  garagesByType: 'Garages validés par type de service',
 
   catalogHint:
     "Les types et sous-types apparaissent dans l'app (filtres, recherche, fiche garage). Renommer un sous-type met à jour tous les garages.",
@@ -92,7 +92,7 @@ const fr = {
   latitude: 'Latitude',
   longitude: 'Longitude',
   description: 'Description',
-  types: 'Types de service',
+  types: 'Type de service',
   otherServices: 'Autres services (séparés par des virgules)',
   photos: 'Photos',
   addPhotos: 'Ajouter des photos',
@@ -146,7 +146,7 @@ const fr = {
 
   formHint: "Règles du formulaire de création/modification de garage dans l'app mobile.",
   maxPhotos: 'Nombre maximum de photos',
-  minCategories: 'Nombre minimum de types de service',
+  minCategories: 'Type de service obligatoire',
   field: 'Champ',
   visible: 'Affiché',
   required: 'Obligatoire',
@@ -324,7 +324,7 @@ const mg: Record<TKey, string> = {
 
   formHint: "Fitsipiky ny taratasy famoronana/fanovana garazy ao amin'ny app.",
   maxPhotos: 'Isan’ny sary farafahabetsany',
-  minCategories: 'Isan’ny karazana tolotra farafahakeliny',
+  minCategories: 'Tsy maintsy misafidy karazana tolotra',
   field: 'Saha',
   visible: 'Aseho',
   required: 'Tsy maintsy',
