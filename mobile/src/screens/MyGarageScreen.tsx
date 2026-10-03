@@ -32,31 +32,10 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { defaultWeek, summarizeWeek } from '../hours';
 import { useI18n } from '../i18n';
+import { useAppConfig } from '../appConfig';
+import { garageCategoryIds, localized } from '../serviceCatalog';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { DailyStat, DayHours, Garage } from '../types';
-
-const MAX_PHOTOS = 12;
-
-const SERVICE_OPTIONS = [
-  'vidange',
-  'freins',
-  'moteur',
-  'diagnostic',
-  'pneus',
-  'lavage',
-  'lavage intérieur',
-  'lavage extérieur',
-  'climatisation',
-  'batterie',
-  'carrosserie',
-  'suspension',
-  'échappement',
-  'boîte de vitesses',
-  'pare-brise',
-  'dépannage',
-  '4x4',
-  'électricité auto',
-];
 
 function Input({
   icon,
@@ -81,7 +60,10 @@ function Input({
 export function MyGarageScreen() {
   const { user, offline, refreshUser } = useAuth();
   const { colors } = useTheme();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { config, catalog } = useAppConfig();
+  const form = config.garageForm;
+  const MAX_PHOTOS = form.maxPhotos;
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -93,6 +75,7 @@ export function MyGarageScreen() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('Antananarivo');
   const [phone, setPhone] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
   const [services, setServices] = useState<string[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [promo, setPromo] = useState('');
@@ -114,6 +97,7 @@ export function MyGarageScreen() {
     setAddress('');
     setCity('Antananarivo');
     setPhone('');
+    setCategories([]);
     setServices([]);
     setPhotos([]);
     setPromo('');
@@ -130,6 +114,7 @@ export function MyGarageScreen() {
     setAddress(g.address);
     setCity(g.city);
     setPhone(g.phone);
+    setCategories(garageCategoryIds(g));
     setServices(g.services ?? []);
     setPhotos(g.photos ?? []);
     setPromo(g.promo ?? '');
@@ -147,6 +132,24 @@ export function MyGarageScreen() {
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
     );
   };
+
+  /** Désélectionner un type retire aussi ses sous-types. */
+  const toggleCategory = (id: string) => {
+    const subs = new Set(
+      catalog.find((c) => c.id === id)?.subtypes.map((s) => s.label)
+    );
+    if (categories.includes(id)) {
+      setCategories((prev) => prev.filter((x) => x !== id));
+      setServices((prev) => prev.filter((s) => !subs.has(s)));
+    } else {
+      setCategories((prev) => [...prev, id]);
+    }
+  };
+
+  const catalogSubtypes = new Set(
+    catalog.flatMap((c) => c.subtypes.map((s) => s.label))
+  );
+  const otherServices = services.filter((s) => !catalogSubtypes.has(s));
 
   const setDay = (i: number, patch: Partial<DayHours>) =>
     setWeek((prev) => prev.map((d, j) => (j === i ? { ...d, ...patch } : d)));
@@ -237,6 +240,24 @@ export function MyGarageScreen() {
       Alert.alert(t('requiredFields'), t('nameAddressRequired'));
       return;
     }
+    const required: [boolean, string][] = [
+      [form.fields.phone.required && !phone.trim(), t('phone')],
+      [form.fields.city.required && !city.trim(), t('city')],
+      [form.fields.description.required && !description.trim(), t('description')],
+    ];
+    const missing = required.find(([isMissing]) => isMissing);
+    if (missing) {
+      Alert.alert(t('requiredFields'), t('fieldRequired', { field: missing[1] }));
+      return;
+    }
+    if (form.fields.photos.required && photos.length === 0) {
+      Alert.alert(t('requiredFields'), t('photoRequired'));
+      return;
+    }
+    if (categories.length < form.minCategories) {
+      Alert.alert(t('pickCategoryTitle'), t('pickCategoryText', { n: form.minCategories }));
+      return;
+    }
     setBusy(true);
     try {
       const payload = {
@@ -244,7 +265,8 @@ export function MyGarageScreen() {
         address: address.trim(),
         city: city.trim(),
         phone: phone.trim(),
-        services: services.length ? services : ['entretien'],
+        categories,
+        services,
         photos,
         promo: promo.trim(),
         priceList: parsePrices(),
@@ -386,25 +408,33 @@ export function MyGarageScreen() {
               value={address}
               onChangeText={setAddress}
             />
-            <Input
-              icon="map-outline"
-              placeholder={t('city')}
-              value={city}
-              onChangeText={setCity}
-            />
-            <Input
-              icon="call-outline"
-              placeholder={t('phone')}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-            <Input
-              icon="document-text-outline"
-              placeholder={t('description')}
-              value={description}
-              onChangeText={setDescription}
-            />
+            {form.fields.city.visible && (
+              <Input
+                icon="map-outline"
+                placeholder={`${t('city')}${form.fields.city.required ? ' *' : ''}`}
+                value={city}
+                onChangeText={setCity}
+              />
+            )}
+            {form.fields.phone.visible && (
+              <Input
+                icon="call-outline"
+                placeholder={`${t('phone')}${form.fields.phone.required ? ' *' : ''}`}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            )}
+            {form.fields.description.visible && (
+              <Input
+                icon="document-text-outline"
+                placeholder={`${t('description')}${form.fields.description.required ? ' *' : ''}`}
+                value={description}
+                onChangeText={setDescription}
+              />
+            )}
+            {form.fields.hours.visible && (
+            <>
             {/* Horaires par jour */}
             <Text style={styles.sectionLabel}>{t('hoursPerDay')}</Text>
             <View style={styles.hoursBox}>
@@ -468,48 +498,99 @@ export function MyGarageScreen() {
                 }}
               />
             )}
+            </>
+            )}
 
-            {/* Services : multi-sélection */}
-            <Text style={styles.sectionLabel}>
-              {t('servicesSelected', { n: services.length })}
-            </Text>
-            <View style={styles.chipsWrap}>
-              {[...new Set([...SERVICE_OPTIONS, ...services])].map((s) => {
-                const on = services.includes(s);
+            {/* Types de service puis sous-types */}
+            <Text style={styles.sectionLabel}>{t('serviceTypesHint')}</Text>
+            <View style={styles.categoriesBox}>
+              {catalog.map((c, i) => {
+                const catOn = categories.includes(c.id);
                 return (
-                  <BouncyPressable
-                    key={s}
-                    onPress={() => toggleService(s)}
-                    style={[styles.serviceChip, on && styles.serviceChipOn]}
+                  <View
+                    key={c.id}
+                    style={[styles.categoryBlock, i > 0 && styles.hoursRowBorder]}
                   >
-                    {on && (
-                      <Ionicons name="checkmark" size={13} color={colors.teal} />
-                    )}
-                    <Text
-                      style={[
-                        styles.serviceChipText,
-                        on && styles.serviceChipTextOn,
-                      ]}
+                    <BouncyPressable
+                      onPress={() => toggleCategory(c.id)}
+                      style={styles.categoryRow}
                     >
-                      {s}
-                    </Text>
-                  </BouncyPressable>
+                      <View style={[styles.dayToggle, catOn && styles.dayToggleOn]}>
+                        {catOn && (
+                          <Ionicons name="checkmark" size={13} color={colors.white} />
+                        )}
+                      </View>
+                      <Text style={styles.categoryText}>
+                        {c.emoji} {localized(c, lang)}
+                      </Text>
+                    </BouncyPressable>
+                    {catOn && c.subtypes.length > 0 && (
+                      <View style={styles.subChipsWrap}>
+                        {c.subtypes.map((s) => {
+                          const on = services.includes(s.label);
+                          return (
+                            <BouncyPressable
+                              key={s.id}
+                              onPress={() => toggleService(s.label)}
+                              style={[styles.serviceChip, on && styles.serviceChipOn]}
+                            >
+                              {on && (
+                                <Ionicons name="checkmark" size={13} color={colors.teal} />
+                              )}
+                              <Text
+                                style={[
+                                  styles.serviceChipText,
+                                  on && styles.serviceChipTextOn,
+                                ]}
+                              >
+                                {localized(s, lang)}
+                              </Text>
+                            </BouncyPressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
                 );
               })}
             </View>
 
-            <Input
-              icon="pricetag-outline"
-              placeholder={t('promoPlaceholder')}
-              value={promo}
-              onChangeText={setPromo}
-            />
-            <Input
-              icon="cash-outline"
-              placeholder={t('pricesPlaceholder')}
-              value={priceText}
-              onChangeText={setPriceText}
-            />
+            {otherServices.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>{t('otherServices')}</Text>
+                <View style={styles.chipsWrap}>
+                  {otherServices.map((s) => (
+                    <BouncyPressable
+                      key={s}
+                      onPress={() => toggleService(s)}
+                      style={[styles.serviceChip, styles.serviceChipOn]}
+                    >
+                      <Ionicons name="close" size={13} color={colors.teal} />
+                      <Text style={[styles.serviceChipText, styles.serviceChipTextOn]}>
+                        {s}
+                      </Text>
+                    </BouncyPressable>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {form.fields.promo.visible && (
+              <Input
+                icon="pricetag-outline"
+                placeholder={t('promoPlaceholder')}
+                value={promo}
+                onChangeText={setPromo}
+              />
+            )}
+            {form.fields.prices.visible && (
+              <Input
+                icon="cash-outline"
+                placeholder={t('pricesPlaceholder')}
+                value={priceText}
+                onChangeText={setPriceText}
+              />
+            )}
 
             <View style={styles.toggles}>
               <BouncyPressable
@@ -525,20 +606,23 @@ export function MyGarageScreen() {
                   {isOpen ? t('open') : t('closed')}
                 </Text>
               </BouncyPressable>
-              <BouncyPressable
-                onPress={() => setMobileService((v) => !v)}
-                style={[styles.toggle, mobileService && styles.toggleOn]}
-              >
-                <Ionicons
-                  name="car"
-                  size={16}
-                  color={mobileService ? colors.teal : colors.faint}
-                />
-                <Text style={styles.toggleText}>{t('movesAround')}</Text>
-              </BouncyPressable>
+              {form.fields.mobileService.visible && (
+                <BouncyPressable
+                  onPress={() => setMobileService((v) => !v)}
+                  style={[styles.toggle, mobileService && styles.toggleOn]}
+                >
+                  <Ionicons
+                    name="car"
+                    size={16}
+                    color={mobileService ? colors.teal : colors.faint}
+                  />
+                  <Text style={styles.toggleText}>{t('movesAround')}</Text>
+                </BouncyPressable>
+              )}
             </View>
 
             {/* Photos */}
+            {form.fields.photos.visible && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -561,10 +645,14 @@ export function MyGarageScreen() {
               {photos.length < MAX_PHOTOS && (
                 <BouncyPressable onPress={pickPhoto} style={styles.photoAdd}>
                   <Ionicons name="camera-outline" size={20} color={colors.teal} />
-                  <Text style={styles.photoAddText}>{t('photo')}</Text>
+                  <Text style={styles.photoAddText}>
+                    {t('photo')}
+                    {form.fields.photos.required ? ' *' : ''}
+                  </Text>
                 </BouncyPressable>
               )}
             </ScrollView>
+            )}
 
             <BouncyPressable
               onPress={onSubmit}
@@ -817,6 +905,27 @@ const createStyles = (colors: ThemeColors) =>
     flexWrap: 'wrap',
     gap: 7,
     marginBottom: 12,
+  },
+  categoriesBox: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    marginBottom: 12,
+  },
+  categoryBlock: { paddingHorizontal: 12, paddingVertical: 9 },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  categoryText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: font.bold,
+    color: colors.ink,
+  },
+  subChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 9,
+    marginLeft: 32,
   },
   serviceChip: {
     flexDirection: 'row',

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +17,7 @@ import { BouncyPressable } from '../components/Pressable';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
+import { useAppConfig } from '../appConfig';
 import { font, radii, type ThemeColors } from '../theme';
 
 type Styles = ReturnType<typeof createStyles>;
@@ -113,10 +115,28 @@ function Preferences({ styles, colors }: { styles: Styles; colors: ThemeColors }
   );
 }
 
+/** Contact support défini dans le site super admin (masqué s'il est vide). */
+function SupportLink({ styles }: { styles: Styles }) {
+  const { t } = useI18n();
+  const { support } = useAppConfig().config;
+  const target = support.phone
+    ? `tel:${support.phone}`
+    : support.email
+      ? `mailto:${support.email}`
+      : null;
+  if (!target) return null;
+  return (
+    <Text style={styles.switch} onPress={() => Linking.openURL(target)}>
+      {t('support')} · {support.phone || support.email}
+    </Text>
+  );
+}
+
 export function GarageAuthScreen() {
   const { user, login, register, logout, offline } = useAuth();
   const { t } = useI18n();
   const { colors } = useTheme();
+  const { config } = useAppConfig();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -138,7 +158,9 @@ export function GarageAuthScreen() {
       if (mode === 'login') await login(email.trim(), password);
       else {
         await register(email.trim(), password, fullName.trim());
-        Alert.alert(t('accountCreatedTitle'), t('accountCreatedText'));
+        if (config.approval.accounts) {
+          Alert.alert(t('accountCreatedTitle'), t('accountCreatedText'));
+        }
       }
     } catch (e) {
       Alert.alert(t('error'), e instanceof Error ? e.message : t('fail'));
@@ -182,6 +204,7 @@ export function GarageAuthScreen() {
             )}
 
             <Preferences styles={styles} colors={colors} />
+            <SupportLink styles={styles} />
 
             <BouncyPressable onPress={() => logout()} style={styles.logoutBtn}>
               <Ionicons name="log-out-outline" size={17} color={colors.danger} />
@@ -263,6 +286,7 @@ export function GarageAuthScreen() {
             </Text>
 
             <Preferences styles={styles} colors={colors} />
+            <SupportLink styles={styles} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

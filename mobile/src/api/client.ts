@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { API_BASE_URL } from '../config';
+import { garageMatches } from '../serviceCatalog';
 import type {
   Appointment,
   AuthUser,
@@ -207,6 +208,8 @@ async function api<T>(
 export async function fetchGarages(params?: {
   q?: string;
   city?: string;
+  category?: string;
+  service?: string;
   lat?: number;
   lng?: number;
 }): Promise<GaragesResponse> {
@@ -214,30 +217,23 @@ export async function fetchGarages(params?: {
   const query = new URLSearchParams();
   if (params?.q) query.set('q', params.q);
   if (params?.city) query.set('city', params.city);
+  if (params?.category) query.set('category', params.category);
+  if (params?.service) query.set('service', params.service);
   if (params?.lat != null) query.set('lat', String(params.lat));
   if (params?.lng != null) query.set('lng', String(params.lng));
+
+  const filterCached = (garages: Garage[]) =>
+    garages.filter(
+      (g) =>
+        garageMatches(g, params ?? {}) &&
+        (!params?.city ||
+          g.city.toLowerCase().includes(params.city.toLowerCase()))
+    );
 
   if (!online) {
     const cached = await getCachedGarages();
     if (cached) {
-      let list = cached.garages;
-      if (params?.q) {
-        const q = params.q.toLowerCase();
-        list = list.filter(
-          (g) =>
-            g.name.toLowerCase().includes(q) ||
-            g.city.toLowerCase().includes(q) ||
-            g.address.toLowerCase().includes(q) ||
-            (g.description ?? '').toLowerCase().includes(q) ||
-            g.services?.some((s) => s.toLowerCase().includes(q))
-        );
-      }
-      if (params?.city) {
-        list = list.filter((g) =>
-          g.city.toLowerCase().includes(params.city!.toLowerCase())
-        );
-      }
-      return { ...cached, offline: true, garages: list };
+      return { ...cached, offline: true, garages: filterCached(cached.garages) };
     }
     throw new Error('Hors ligne et aucun cache disponible');
   }
@@ -247,7 +243,9 @@ export async function fetchGarages(params?: {
       `/api/garages?${query.toString()}`
     );
     // Ne jamais laisser un échec de cache masquer la réponse fraîche du serveur
-    const isSearch = Boolean(params?.q || params?.city);
+    const isSearch = Boolean(
+      params?.q || params?.city || params?.category || params?.service
+    );
     if (isSearch) {
       void mergeGaragesIntoCache(data.garages);
     } else {
@@ -257,19 +255,7 @@ export async function fetchGarages(params?: {
   } catch (err) {
     const cached = await getCachedGarages();
     if (cached) {
-      let list = cached.garages;
-      if (params?.q) {
-        const q = params.q.toLowerCase();
-        list = list.filter(
-          (g) =>
-            g.name.toLowerCase().includes(q) ||
-            g.city.toLowerCase().includes(q) ||
-            g.address.toLowerCase().includes(q) ||
-            (g.description ?? '').toLowerCase().includes(q) ||
-            g.services?.some((s) => s.toLowerCase().includes(q))
-        );
-      }
-      return { ...cached, offline: true, garages: list };
+      return { ...cached, offline: true, garages: filterCached(cached.garages) };
     }
     throw err;
   }

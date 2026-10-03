@@ -5,6 +5,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useAppConfig } from '../appConfig';
 import { useTheme } from '../context/ThemeContext';
 import { font } from '../theme';
 
@@ -16,6 +17,7 @@ type Props = {
 
 export function MekanoLogo({ size = 72, showWordmark = true, light }: Props) {
   const { colors } = useTheme();
+  const { config, logoUri } = useAppConfig();
   const opacity = useSharedValue(0);
 
   useEffect(() => {
@@ -27,16 +29,16 @@ export function MekanoLogo({ size = 72, showWordmark = true, light }: Props) {
   return (
     <Animated.View style={[styles.wrap, style]}>
       <Image
-        source={require('../../assets/mekano-logo.png')}
+        source={logoUri ? { uri: logoUri } : require('../../assets/mekano-logo.png')}
         style={{ width: size, height: size, borderRadius: size * 0.22 }}
         resizeMode="contain"
-        accessibilityLabel="Logo Mekano"
+        accessibilityLabel={`Logo ${config.appName}`}
       />
       {showWordmark && (
         <Text
           style={[styles.word, { color: light ? colors.white : colors.teal }]}
         >
-          MEKANO
+          {config.appName.toUpperCase()}
         </Text>
       )}
     </Animated.View>

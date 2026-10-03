@@ -4,6 +4,12 @@ import { query } from '../db/pool';
 import { config } from '../config';
 import { sendAdminValidationEmail } from '../mailer';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
+import { getConfig } from '../appSettings';
+import {
+  categoryLabel,
+  matchingCategoryIds,
+  resolveCategories,
+} from '../serviceCatalog';
 
 /** Horaires d'une journée : { open: 'HH:MM', close: 'HH:MM', closed: bool } */
 export type DayHours = { open: string; close: string; closed: boolean };
@@ -18,6 +24,7 @@ export type GarageRow = {
   phone: string;
   latitude: number;
   longitude: number;
+  categories: string[];
   services: string[];
   photos: string[];
   mobile_service: boolean;
@@ -28,7 +35,7 @@ export type GarageRow = {
   opening_hours: string;
   hours_json: DayHours[] | null;
   is_open: boolean;
-  status: 'pending' | 'approved';
+  status: 'pending' | 'approved' | 'hidden';
   updated_at: string;
   created_at: string;
   distance_km?: number;
@@ -36,7 +43,7 @@ export type GarageRow = {
   review_count?: number;
 };
 
-function mapGarage(row: GarageRow) {
+export function mapGarage(row: GarageRow) {
   return {
     id: row.id,
     ownerId: row.owner_id,
@@ -47,6 +54,7 @@ function mapGarage(row: GarageRow) {
     phone: row.phone,
     latitude: row.latitude,
     longitude: row.longitude,
+    categories: row.categories ?? [],
     services: row.services ?? [],
     photos: row.photos ?? [],
     mobileService: row.mobile_service ?? false,
@@ -67,9 +75,34 @@ function mapGarage(row: GarageRow) {
   };
 }
 
-const RATING_SELECT = `,
+export const RATING_SELECT = `,
   (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM reviews r WHERE r.garage_id = garages.id) AS avg_rating,
   (SELECT COUNT(*) FROM reviews r WHERE r.garage_id = garages.id) AS review_count`;
+
+/** Champs obligatoires du formulaire garage, définis dans la config super admin. */
+export function checkGarageForm(
+  appConfig: Awaited<ReturnType<typeof getConfig>>['config'],
+  g: {
+    phone?: string;
+    city?: string;
+    description?: string;
+    photos?: unknown[];
+    categories: string[];
+  }
+): string | null {
+  const f = appConfig.garageForm.fields;
+  if (f.phone.required && !g.phone?.trim()) return 'Téléphone obligatoire';
+  if (f.city.required && !g.city?.trim()) return 'Ville obligatoire';
+  if (f.description.required && !g.description?.trim()) return 'Description obligatoire';
+  if (f.photos.required && !g.photos?.length) return 'Au moins une photo est obligatoire';
+  if ((g.photos?.length ?? 0) > appConfig.garageForm.maxPhotos) {
+    return `${appConfig.garageForm.maxPhotos} photos maximum`;
+  }
+  if (g.categories.length < appConfig.garageForm.minCategories) {
+    return 'Choisis au moins un type de service';
+  }
+  return null;
+}
 
 const router = Router();
 
@@ -77,23 +110,41 @@ const router = Router();
 router.get('/', async (req, res) => {
   const q = String(req.query.q || '').trim();
   const city = String(req.query.city || '').trim();
+  const category = String(req.query.category || '').trim();
+  const service = String(req.query.service || '').trim();
   const lat = req.query.lat != null ? Number(req.query.lat) : null;
   const lng = req.query.lng != null ? Number(req.query.lng) : null;
   const radiusKm =
     req.query.radiusKm != null ? Number(req.query.radiusKm) : 50;
 
   const params: unknown[] = [];
-  const where: string[] = [`status = 'approved'`];
+  const where: string[] = [
+    `status = 'approved'`,
+    `NOT EXISTS (SELECT 1 FROM users u WHERE u.id = garages.owner_id AND u.status = 'suspended')`,
+  ];
 
   if (q) {
     params.push(`%${q}%`);
+    const likeIdx = params.length;
+    params.push(matchingCategoryIds(q));
+    const catIdx = params.length;
     where.push(
-      `(name ILIKE $${params.length} OR description ILIKE $${params.length} OR address ILIKE $${params.length} OR city ILIKE $${params.length} OR EXISTS (SELECT 1 FROM unnest(services) AS s WHERE s ILIKE $${params.length}))`
+      `(name ILIKE $${likeIdx} OR description ILIKE $${likeIdx} OR address ILIKE $${likeIdx} OR city ILIKE $${likeIdx} OR EXISTS (SELECT 1 FROM unnest(services) AS s WHERE s ILIKE $${likeIdx}) OR categories && $${catIdx}::text[])`
     );
   }
   if (city) {
     params.push(city);
     where.push(`city ILIKE $${params.length}`);
+  }
+  if (category) {
+    params.push(category);
+    where.push(`$${params.length} = ANY(categories)`);
+  }
+  if (service) {
+    params.push(service);
+    where.push(
+      `EXISTS (SELECT 1 FROM unnest(services) AS s WHERE lower(s) = lower($${params.length}))`
+    );
   }
 
   let distanceSelect = '';
@@ -283,6 +334,7 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
     phone = '',
     latitude,
     longitude,
+    categories: rawCategories = [],
     services = [],
     photos = [],
     mobileService = false,
@@ -323,14 +375,26 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
     });
   }
 
-  const approvalToken = crypto.randomUUID();
+  const { config: appConfig } = await getConfig();
+  const categories = resolveCategories(rawCategories, services);
+  const formError = checkGarageForm(appConfig, {
+    phone,
+    city,
+    description,
+    photos,
+    categories,
+  });
+  if (formError) return res.status(400).json({ error: formError });
+
+  const needsApproval = appConfig.approval.garages;
+  const approvalToken = needsApproval ? crypto.randomUUID() : null;
 
   const { rows } = await query<GarageRow>(
     `INSERT INTO garages
       (owner_id, name, description, address, city, phone, latitude, longitude,
        services, photos, mobile_service, promo, price_list, opening_hours,
-       hours_json, is_open, status, approval_token)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17)
+       hours_json, is_open, status, approval_token, categories)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      RETURNING *`,
     [
       req.user!.id,
@@ -349,17 +413,20 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
       openingHours,
       hoursJson ? JSON.stringify(hoursJson) : null,
       isOpen,
+      needsApproval ? 'pending' : 'approved',
       approvalToken,
+      categories,
     ]
   );
 
-  await sendAdminValidationEmail({
+  if (approvalToken) await sendAdminValidationEmail({
     subject: 'Nouveau garage à valider',
     intro: 'Un nouveau garage vient d’être publié sur Mekano et attend ta validation avant d’être visible par les clients.',
     details: {
       Garage: name,
       Adresse: `${address}${city ? `, ${city}` : ''}`,
       'Téléphone': phone || '—',
+      'Types de service': categories.map(categoryLabel).join(', ') || '—',
       Services: (services as string[]).join(', ') || '—',
       'Propriétaire': `${owner.rows[0].full_name} (${owner.rows[0].email})`,
     },
@@ -384,13 +451,19 @@ router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
 
   const g = existing.rows[0];
   const b = req.body;
+  const services = b.services ?? g.services;
+  const categories =
+    b.categories !== undefined || b.services !== undefined
+      ? resolveCategories(b.categories ?? g.categories, services)
+      : g.categories;
 
   const { rows } = await query<GarageRow>(
     `UPDATE garages SET
       name = $1, description = $2, address = $3, city = $4, phone = $5,
       latitude = $6, longitude = $7, services = $8, photos = $9,
       mobile_service = $10, promo = $11, price_list = $12,
-      opening_hours = $13, hours_json = $14, is_open = $15, updated_at = NOW()
+      opening_hours = $13, hours_json = $14, is_open = $15,
+      categories = $17, updated_at = NOW()
      WHERE id = $16
      RETURNING *`,
     [
@@ -401,7 +474,7 @@ router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
       b.phone ?? g.phone,
       b.latitude ?? g.latitude,
       b.longitude ?? g.longitude,
-      b.services ?? g.services,
+      services,
       b.photos ?? g.photos,
       b.mobileService ?? g.mobile_service,
       b.promo ?? g.promo,
@@ -416,6 +489,7 @@ router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
           : null,
       b.isOpen ?? g.is_open,
       req.params.id,
+      categories,
     ]
   );
   return res.json(mapGarage(rows[0]));

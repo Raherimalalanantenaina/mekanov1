@@ -15,6 +15,7 @@ import { RouteScreen } from '../screens/RouteScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
+import { useAppConfig } from '../appConfig';
 import { font } from '../theme';
 import type { RootStackParamList } from './types';
 
@@ -24,6 +25,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function MainTabs() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const { features } = useAppConfig().config;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -79,11 +81,13 @@ function MainTabs() {
         component={MapScreen}
         options={{ tabBarLabel: t('tabMap') }}
       />
-      <Tab.Screen
-        name="Demandes"
-        component={RequestsScreen}
-        options={{ tabBarLabel: t('tabRequests') }}
-      />
+      {features.quotes || features.appointments ? (
+        <Tab.Screen
+          name="Demandes"
+          component={RequestsScreen}
+          options={{ tabBarLabel: t('tabRequests') }}
+        />
+      ) : null}
       <Tab.Screen
         name="Publier"
         component={MyGarageScreen}

@@ -35,7 +35,9 @@ import { BouncyPressable } from '../components/Pressable';
 import { useTheme } from '../context/ThemeContext';
 import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
-import { font, gradients, radii, shadow, type ThemeColors } from '../theme';
+import { useAppConfig } from '../appConfig';
+import { categoryLabel, garageCategoryIds } from '../serviceCatalog';
+import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage, Review } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -67,11 +69,13 @@ function InfoRow({
 
 export function GarageDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
-  const { colors } = useTheme();
+  const { colors, gradients } = useTheme();
+  const { config } = useAppConfig();
+  const { features } = config;
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const pad = width < 360 ? 14 : 20;
 
   const [garage, setGarage] = useState<Garage | null>(null);
@@ -364,6 +368,15 @@ export function GarageDetailScreen({ route, navigation }: Props) {
           }
         />
         <InfoRow
+          icon="grid-outline"
+          label={t('serviceTypes')}
+          value={
+            garageCategoryIds(garage)
+              .map((c) => categoryLabel(c, lang))
+              .join('\n') || t('notProvided')
+          }
+        />
+        <InfoRow
           icon="build-outline"
           label={t('services')}
           value={
@@ -430,33 +443,40 @@ export function GarageDetailScreen({ route, navigation }: Props) {
         </BouncyPressable>
 
         <View style={styles.actionGrid}>
-          {garage.phone ? (
+          {features.whatsapp && garage.phone ? (
             <BouncyPressable onPress={onWhatsApp} style={styles.actionCell}>
               <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
               <Text style={styles.actionLabel}>WhatsApp</Text>
             </BouncyPressable>
           ) : null}
-          <BouncyPressable onPress={onShare} style={styles.actionCell}>
-            <Ionicons name="share-social" size={18} color={colors.teal} />
-            <Text style={styles.actionLabel}>{t('share')}</Text>
-          </BouncyPressable>
-          <BouncyPressable
-            onPress={() => setShowQuote(true)}
-            style={styles.actionCell}
-          >
-            <Ionicons name="document-text" size={18} color={colors.amberDark} />
-            <Text style={styles.actionLabel}>{t('quote')}</Text>
-          </BouncyPressable>
-          <BouncyPressable
-            onPress={() => setShowBooking(true)}
-            style={styles.actionCell}
-          >
-            <Ionicons name="calendar" size={18} color={colors.teal} />
-            <Text style={styles.actionLabel}>{t('booking')}</Text>
-          </BouncyPressable>
+          {features.share && (
+            <BouncyPressable onPress={onShare} style={styles.actionCell}>
+              <Ionicons name="share-social" size={18} color={colors.teal} />
+              <Text style={styles.actionLabel}>{t('share')}</Text>
+            </BouncyPressable>
+          )}
+          {features.quotes && (
+            <BouncyPressable
+              onPress={() => setShowQuote(true)}
+              style={styles.actionCell}
+            >
+              <Ionicons name="document-text" size={18} color={colors.amberDark} />
+              <Text style={styles.actionLabel}>{t('quote')}</Text>
+            </BouncyPressable>
+          )}
+          {features.appointments && (
+            <BouncyPressable
+              onPress={() => setShowBooking(true)}
+              style={styles.actionCell}
+            >
+              <Ionicons name="calendar" size={18} color={colors.teal} />
+              <Text style={styles.actionLabel}>{t('booking')}</Text>
+            </BouncyPressable>
+          )}
         </View>
 
         {/* Avis */}
+        {features.reviews && (
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>
             {t('reviews')} ({reviews.length})
@@ -465,7 +485,8 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             {t('addReview')}
           </Text>
         </View>
-        {reviews.length === 0 ? (
+        )}
+        {!features.reviews ? null : reviews.length === 0 ? (
           <Text style={styles.emptyReviews}>{t('noReviews')}</Text>
         ) : (
           reviews.map((r) => (

@@ -6,6 +6,8 @@ import { BouncyPressable } from './Pressable';
 import { useTheme } from '../context/ThemeContext';
 import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
+import { useAppConfig } from '../appConfig';
+import { categoryLabel, garageCategoryIds } from '../serviceCatalog';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
 
@@ -51,7 +53,8 @@ export function GarageCard({
   onToggleFavorite,
 }: Props) {
   const { colors } = useTheme();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  useAppConfig();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <Animated.View entering={FadeInDown.duration(320)}>
@@ -142,9 +145,9 @@ export function GarageCard({
               <Text style={styles.mobileText}>{t('movesAround')}</Text>
             </View>
           )}
-          {garage.services?.slice(0, 1).map((s) => (
-            <View key={s} style={styles.chip}>
-              <Text style={styles.chipText}>{s}</Text>
+          {garageCategoryIds(garage).slice(0, 2).map((id) => (
+            <View key={id} style={styles.chip}>
+              <Text style={styles.chipText}>{categoryLabel(id, lang)}</Text>
             </View>
           ))}
         </View>

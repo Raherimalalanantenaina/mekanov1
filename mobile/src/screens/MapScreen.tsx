@@ -32,6 +32,7 @@ import { UserLocationMarker } from '../components/UserLocationMarker';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
+import { garageMatches } from '../serviceCatalog';
 import { mapStyleFor, circlePolygon, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
@@ -123,15 +124,8 @@ export function MapScreen() {
   /** Garages filtrés par recherche + rayon, triés par distance. */
   const visible = useMemo(() => {
     let list = withDistance;
-    const term = q.trim().toLowerCase();
-    if (term) {
-      list = list.filter(
-        (g) =>
-          g.name.toLowerCase().includes(term) ||
-          g.city.toLowerCase().includes(term) ||
-          g.address.toLowerCase().includes(term) ||
-          g.services?.some((s) => s.toLowerCase().includes(term))
-      );
+    if (q.trim()) {
+      list = list.filter((g) => garageMatches(g, { q }));
     }
     if (radiusKm != null && userPos) {
       list = list.filter(

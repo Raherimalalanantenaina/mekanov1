@@ -21,6 +21,9 @@ export type Garage = {
   phone: string;
   latitude: number;
   longitude: number;
+  /** Ids des types de service (catalogue géré par le super admin) */
+  categories: string[];
+  /** Sous-types proposés (libellés du catalogue ou texte libre) */
   services: string[];
   photos: string[];
   mobileService: boolean;
@@ -32,8 +35,8 @@ export type Garage = {
   /** Horaires structurés par jour (lundi = index 0), null si non renseignés */
   hoursJson?: DayHours[] | null;
   isOpen: boolean;
-  /** 'pending' = en attente de validation par l'administrateur */
-  status?: 'pending' | 'approved';
+  /** 'pending' = en attente de validation, 'hidden' = masqué par le super admin */
+  status?: 'pending' | 'approved' | 'hidden';
   updatedAt?: string;
   createdAt?: string;
   distanceKm?: number;

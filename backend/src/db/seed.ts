@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { pool } from './pool';
+import { resolveCategories } from '../serviceCatalog';
 
 // Règle : un compte = un garage. Chaque garage de démo a son propre compte.
 // Le seed ne SUPPRIME jamais un garage existant (sinon CASCADE efface
@@ -15,7 +16,7 @@ const samples = [
     phone: '+261 34 00 000 01',
     latitude: -18.8792,
     longitude: 47.5079,
-    services: ['vidange', 'freins', 'diagnostic', 'pneus', 'lavage'],
+    services: ['Vidange', 'Freinage', 'Diagnostic électronique', 'Réparation pneu', 'Lavage'],
   },
   {
     email: 'garage2@mekano.app',
@@ -27,7 +28,7 @@ const samples = [
     phone: '+261 34 00 000 02',
     latitude: -18.9036,
     longitude: 47.5215,
-    services: ['moteur', 'climatisation', 'batterie', 'lavage'],
+    services: ['Moteur', 'Recharge clim', 'Réparation clim', 'Batterie', 'Lavage'],
   },
   {
     email: 'garage3@mekano.app',
@@ -39,7 +40,7 @@ const samples = [
     phone: '+261 34 00 000 03',
     latitude: -18.7969,
     longitude: 47.4788,
-    services: ['4x4', 'suspension', 'échappement'],
+    services: ['Moteur', 'Embrayage', 'Remorquage', 'Intervention sur route'],
   },
   {
     email: 'garage4@mekano.app',
@@ -51,7 +52,7 @@ const samples = [
     phone: '+261 34 00 000 04',
     latitude: -18.1492,
     longitude: 49.4023,
-    services: ['vidange', 'pneus', 'carrosserie'],
+    services: ['Vidange', 'Crevaison', 'Montage pneu', 'Tôlerie', 'Peinture'],
   },
 ];
 
@@ -59,6 +60,7 @@ async function seed() {
   const passwordHash = await bcrypt.hash('garage123', 10);
 
   for (const g of samples) {
+    const categories = resolveCategories([], g.services);
     const owner = await pool.query<{ id: string }>(
       `INSERT INTO users (email, password_hash, full_name, role, status)
        VALUES ($1, $2, $3, 'garage', 'approved')
@@ -88,6 +90,7 @@ async function seed() {
            latitude = $7,
            longitude = $8,
            services = $9,
+           categories = $10,
            status = 'approved',
            updated_at = NOW()
          WHERE id = $1`,
@@ -101,13 +104,14 @@ async function seed() {
           g.latitude,
           g.longitude,
           g.services,
+          categories,
         ]
       );
     } else {
       await pool.query(
         `INSERT INTO garages
-          (owner_id, name, description, address, city, phone, latitude, longitude, services, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'approved')`,
+          (owner_id, name, description, address, city, phone, latitude, longitude, services, categories, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'approved')`,
         [
           ownerId,
           g.name,
@@ -118,6 +122,7 @@ async function seed() {
           g.latitude,
           g.longitude,
           g.services,
+          categories,
         ]
       );
     }

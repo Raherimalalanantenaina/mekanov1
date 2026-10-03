@@ -2,17 +2,17 @@ import React from 'react';
 import { StatusBar, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppConfigProvider } from './src/appConfig';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { I18nProvider } from './src/i18n';
 import { MekanoLogo } from './src/components/MekanoLogo';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { registerForPush } from './src/push';
-import { gradients } from './src/theme';
 
 function Boot() {
   const { loading, user } = useAuth();
-  const { mode } = useTheme();
+  const { mode, gradients } = useTheme();
 
   // Enregistre le jeton push au démarrage, puis à chaque connexion garage
   // (pour associer le compte au jeton côté serveur).
@@ -41,13 +41,15 @@ function Boot() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <I18nProvider>
-          <AuthProvider>
-            <Boot />
-          </AuthProvider>
-        </I18nProvider>
-      </ThemeProvider>
+      <AppConfigProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <AuthProvider>
+              <Boot />
+            </AuthProvider>
+          </I18nProvider>
+        </ThemeProvider>
+      </AppConfigProvider>
     </SafeAreaProvider>
   );
 }

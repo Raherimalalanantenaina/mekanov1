@@ -27,33 +27,29 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
+import { configText, useAppConfig } from '../appConfig';
+import { localized } from '../serviceCatalog';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 
-const QUICK_FILTERS = [
-  'vidange',
-  'freins',
-  'pneus',
-  'diagnostic',
-  'moteur',
-  'lavage',
-];
 type SortMode = 'distance' | 'rating';
 
 export function HomeScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { offline, refreshConnectivity } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { colors } = useTheme();
+  const { config, catalog, logoUri } = useAppConfig();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const pad = width < 360 ? 14 : 18;
 
   const [q, setQ] = useState('');
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeService, setActiveService] = useState<string | null>(null);
   const [garages, setGarages] = useState<Garage[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
@@ -78,7 +74,12 @@ export function HomeScreen() {
           coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         }
         const [data, favs] = await Promise.all([
-          fetchGarages({ q: query ?? q, ...coords }),
+          fetchGarages({
+            q: query ?? q,
+            category: activeCategory ?? undefined,
+            service: activeService ?? undefined,
+            ...coords,
+          }),
           getFavorites(),
         ]);
         setGarages(data.garages);
@@ -91,7 +92,7 @@ export function HomeScreen() {
         setLoading(false);
       }
     },
-    [q, refreshConnectivity]
+    [q, activeCategory, activeService, refreshConnectivity]
   );
 
   useFocusEffect(
@@ -101,13 +102,17 @@ export function HomeScreen() {
     }, [load])
   );
 
-  const applyFilter = (f: string) => {
-    const next = activeFilter === f ? null : f;
-    setActiveFilter(next);
-    setQ(next ?? '');
-    setLoading(true);
-    load(next ?? '');
+  // Le changement de filtre recrée `load`, que useFocusEffect relance
+  const applyCategory = (id: string) => {
+    setActiveCategory((prev) => (prev === id ? null : id));
+    setActiveService(null);
   };
+
+  const applyService = (s: string | null) => {
+    setActiveService((prev) => (prev === s ? null : s));
+  };
+
+  const currentCategory = catalog.find((c) => c.id === activeCategory);
 
   const onToggleFav = async (id: string) => {
     const next = await toggleFavorite(id);
@@ -167,22 +172,26 @@ export function HomeScreen() {
       >
         <View style={styles.brandRow}>
           <Image
-            source={require('../../assets/mekano-logo.png')}
+            source={logoUri ? { uri: logoUri } : require('../../assets/mekano-logo.png')}
             style={styles.brandLogo}
             resizeMode="contain"
           />
           <View style={{ flex: 1 }}>
-            <Text style={styles.brand}>Mekano</Text>
+            <Text style={styles.brand}>{config.appName}</Text>
           </View>
-          <BouncyPressable onPress={onSos} style={styles.sosBtn}>
-            <Ionicons name="flash" size={15} color={colors.white} />
-            <Text style={styles.sosText}>{t('sos')}</Text>
-          </BouncyPressable>
+          {config.features.sos && (
+            <BouncyPressable onPress={onSos} style={styles.sosBtn}>
+              <Ionicons name="flash" size={15} color={colors.white} />
+              <Text style={styles.sosText}>{t('sos')}</Text>
+            </BouncyPressable>
+          )}
         </View>
 
         <Text style={styles.heroTitle}>
-          {t('heroTitle1')}{' '}
-          <Text style={{ color: colors.teal }}>{t('heroTitle2')}</Text>
+          {configText(config.texts.heroTitle1, lang, t('heroTitle1'))}{' '}
+          <Text style={{ color: colors.teal }}>
+            {configText(config.texts.heroTitle2, lang, t('heroTitle2'))}
+          </Text>
         </Text>
       </View>
 
@@ -199,7 +208,7 @@ export function HomeScreen() {
             setLoading(true);
             load(q);
           }}
-          placeholder={t('searchPlaceholder')}
+          placeholder={configText(config.texts.searchPlaceholder, lang, t('searchPlaceholder'))}
           placeholderTextColor={colors.faint}
           style={styles.search}
           returnKeyType="search"
@@ -211,7 +220,6 @@ export function HomeScreen() {
             color={colors.faint}
             onPress={() => {
               setQ('');
-              setActiveFilter(null);
               setLoading(true);
               load('');
             }}
@@ -238,12 +246,12 @@ export function HomeScreen() {
           alignItems: 'center',
         }}
       >
-        {QUICK_FILTERS.map((f) => {
-          const active = activeFilter === f;
+        {catalog.map((c) => {
+          const active = activeCategory === c.id;
           return (
             <BouncyPressable
-              key={f}
-              onPress={() => applyFilter(f)}
+              key={c.id}
+              onPress={() => applyCategory(c.id)}
               style={[styles.filterChip, active && styles.filterChipActive]}
             >
               <Text
@@ -252,12 +260,43 @@ export function HomeScreen() {
                   active && styles.filterChipTextActive,
                 ]}
               >
-                {f}
+                {c.emoji} {localized(c, lang)}
               </Text>
             </BouncyPressable>
           );
         })}
       </ScrollView>
+
+      {currentCategory && currentCategory.subtypes.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 8, flexGrow: 0, flexShrink: 0 }}
+          contentContainerStyle={{
+            gap: 8,
+            paddingHorizontal: pad,
+            alignItems: 'center',
+          }}
+        >
+          {[null, ...currentCategory.subtypes].map((s) => {
+            const value = s?.label ?? null;
+            const active = activeService === value;
+            return (
+              <BouncyPressable
+                key={s?.id ?? '__all'}
+                onPress={() => applyService(value)}
+                style={[styles.subChip, active && styles.subChipActive]}
+              >
+                <Text
+                  style={[styles.subChipText, active && styles.subChipTextActive]}
+                >
+                  {s ? localized(s, lang) : t('allSubtypes')}
+                </Text>
+              </BouncyPressable>
+            );
+          })}
+        </ScrollView>
+      )}
 
       <OfflineBanner offline={offline || isOfflineData} />
 
@@ -470,6 +509,16 @@ const createStyles = (colors: ThemeColors) =>
     color: colors.white,
     fontWeight: font.extrabold,
   },
+  subChip: {
+    backgroundColor: colors.field,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    height: 30,
+    justifyContent: 'center',
+  },
+  subChipActive: { backgroundColor: colors.tealSoft },
+  subChipText: { color: colors.muted, fontSize: 12, fontWeight: font.semibold },
+  subChipTextActive: { color: colors.tealDark, fontWeight: font.extrabold },
   toolsBar: { flexGrow: 0, flexShrink: 0 },
   tools: { gap: 8, paddingVertical: 10, alignItems: 'center' },
   toolChip: {
