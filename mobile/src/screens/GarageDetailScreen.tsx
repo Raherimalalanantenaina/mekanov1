@@ -35,7 +35,7 @@ import { BouncyPressable } from '../components/Pressable';
 import { useTheme } from '../context/ThemeContext';
 import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
-import { useAppConfig } from '../appConfig';
+import { garageFeatures, planName, useAppConfig } from '../appConfig';
 import { categoryLabel, garageCategoryIds } from '../serviceCatalog';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage, Review } from '../types';
@@ -71,7 +71,6 @@ export function GarageDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const { colors, gradients } = useTheme();
   const { config } = useAppConfig();
-  const { features } = config;
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -139,15 +138,29 @@ export function GarageDetailScreen({ route, navigation }: Props) {
     );
   }
 
+  // Options globales de l'app ET fonctionnalités de l'offre du garage
+  const pf = garageFeatures(garage);
+  const features = {
+    ...pf,
+    whatsapp: config.features.whatsapp && pf.whatsapp,
+    quotes: config.features.quotes && pf.quotes,
+    appointments: config.features.appointments && pf.appointments,
+    reviews: config.features.reviews && pf.reviews,
+    share: config.features.share,
+  };
+  const maxServices = garage.plan ? config.plans[garage.plan]?.maxServices ?? 0 : 0;
+  const services = maxServices > 0 ? garage.services?.slice(0, maxServices) : garage.services;
+  const phone = features.phone ? garage.phone : '';
+
   const onCall = () => {
-    if (!garage.phone) return;
+    if (!phone) return;
     trackGarage(garage.id, 'call');
-    Linking.openURL(`tel:${garage.phone}`);
+    Linking.openURL(`tel:${phone}`);
   };
 
   const onWhatsApp = () => {
-    if (!garage.phone) return;
-    const digits = garage.phone.replace(/[^\d]/g, '');
+    if (!phone) return;
+    const digits = phone.replace(/[^\d]/g, '');
     Linking.openURL(
       `https://wa.me/${digits}?text=${encodeURIComponent(
         `Bonjour ${garage.name}, je vous contacte via Mekano.`
@@ -158,7 +171,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
   const onShare = async () => {
     await Share.share({
       message: `${garage.name} — ${garage.address}, ${garage.city}${
-        garage.phone ? ` · ${garage.phone}` : ''
+        phone ? ` · ${phone}` : ''
       }\nTrouvé sur Mekano`,
     });
   };
@@ -277,7 +290,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
         <View style={styles.heroMeta}>
           <Ionicons name="location" size={13} color="rgba(255,255,255,0.8)" />
           <Text style={styles.city}>{garage.city}</Text>
-          {garage.rating != null && (
+          {features.reviews && garage.rating != null && (
             <Text style={styles.ratingPill}>
               ★ {garage.rating.toFixed(1)} ({garage.reviewCount})
             </Text>
@@ -305,7 +318,13 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             </Text>
           </View>
         </View>
-        {!!garage.promo && (
+        {features.boost && !!garage.plan && garage.plan !== 'free' && (
+          <View style={styles.planPill}>
+            <Ionicons name="ribbon" size={12} color={colors.tealDeep} />
+            <Text style={styles.planPillText}>{planName(config, garage.plan, lang)}</Text>
+          </View>
+        )}
+        {features.extras && !!garage.promo && (
           <View style={styles.promoBanner}>
             <Ionicons name="pricetag" size={13} color={colors.tealDeep} />
             <Text style={styles.promoText}>{garage.promo}</Text>
@@ -321,7 +340,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {garage.photos?.length > 0 && (
+        {features.photos && garage.photos?.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -343,7 +362,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
           <Text style={styles.desc}>{garage.description}</Text>
         ) : null}
 
-        {garage.mobileService && (
+        {features.extras && garage.mobileService && (
           <View style={styles.mobileRow}>
             <Ionicons name="car" size={16} color={colors.teal} />
             <Text style={styles.mobileText}>{t('movesAround')}</Text>
@@ -351,6 +370,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
         )}
 
         <InfoRow icon="location-outline" label={t('address')} value={garage.address} />
+        {features.hours && (
         <InfoRow
           icon="time-outline"
           label={t('hours')}
@@ -367,6 +387,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
               : garage.openingHours
           }
         />
+        )}
         <InfoRow
           icon="grid-outline"
           label={t('serviceTypes')}
@@ -380,13 +401,13 @@ export function GarageDetailScreen({ route, navigation }: Props) {
           icon="build-outline"
           label={t('services')}
           value={
-            garage.services?.length
-              ? garage.services.join(' · ')
+            services?.length
+              ? services.join(' · ')
               : t('notProvided')
           }
         />
 
-        {garage.priceList?.length > 0 && (
+        {features.extras && garage.priceList?.length > 0 && (
           <View style={[styles.infoCard, shadow.card]}>
             <Text style={styles.infoLabel}>{t('prices')}</Text>
             {garage.priceList.map((p, i) => (
@@ -399,7 +420,7 @@ export function GarageDetailScreen({ route, navigation }: Props) {
         )}
 
         {/* Actions principales */}
-        {garage.phone ? (
+        {phone ? (
           <BouncyPressable
             onPress={onCall}
             style={styles.btnWrap}
@@ -412,12 +433,13 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             >
               <Ionicons name="call" size={18} color={colors.white} />
               <Text style={styles.btnText}>
-                {t('call')} {garage.phone}
+                {t('call')} {phone}
               </Text>
             </LinearGradient>
           </BouncyPressable>
         ) : null}
 
+        {features.route && (
         <BouncyPressable
           onPress={() =>
             navigation.navigate('Route', {
@@ -441,9 +463,10 @@ export function GarageDetailScreen({ route, navigation }: Props) {
             </Text>
           </LinearGradient>
         </BouncyPressable>
+        )}
 
         <View style={styles.actionGrid}>
-          {features.whatsapp && garage.phone ? (
+          {features.whatsapp && phone ? (
             <BouncyPressable onPress={onWhatsApp} style={styles.actionCell}>
               <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
               <Text style={styles.actionLabel}>WhatsApp</Text>
@@ -746,6 +769,22 @@ const createStyles = (colors: ThemeColors) =>
     color: colors.tealDeep,
     fontWeight: font.extrabold,
     fontSize: 12.5,
+  },
+  planPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignSelf: 'flex-start',
+    borderRadius: radii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  planPillText: {
+    color: colors.tealDeep,
+    fontWeight: font.extrabold,
+    fontSize: 11.5,
   },
   photosRow: { marginBottom: 16 },
   photo: {

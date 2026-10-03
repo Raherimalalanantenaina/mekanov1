@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { api, compressImage } from '../api';
 import { useCatalog } from '../App';
 import { useI18n } from '../i18n';
-import type { GarageDetail, GarageStatus, PriceItem, UserItem } from '../types';
-import { Check, Field, Modal, useAction } from '../ui';
+import { PLAN_IDS, type GarageDetail, type GarageStatus, type PlanId, type PriceItem, type UserItem } from '../types';
+import { addMonths, Check, Field, Modal, PlanBadge, useAction } from '../ui';
+import { useAppConfig } from '../useAppConfig';
 import { MapPicker } from '../MapPicker';
 
 type Draft = {
@@ -24,6 +25,9 @@ type Draft = {
   openingHours: string;
   isOpen: boolean;
   status: GarageStatus;
+  plan: PlanId;
+  /** AAAA-MM-JJ, vide = sans date de fin */
+  planExpiresAt: string;
 };
 
 const blank: Draft = {
@@ -44,6 +48,8 @@ const blank: Draft = {
   openingHours: 'Lun–Sam 8h–18h',
   isOpen: true,
   status: 'approved',
+  plan: 'free',
+  planExpiresAt: '',
 };
 
 /** Création (id = null) ou modification d'un garage par le super admin. */
@@ -65,6 +71,13 @@ export function GarageEditor({
   const [owner, setOwner] = useState({ email: '', fullName: '', password: '' });
   const [users, setUsers] = useState<UserItem[]>([]);
   const [ownerLabel, setOwnerLabel] = useState('');
+  const [planMeta, setPlanMeta] = useState<{ expired: boolean; request: PlanId | null }>({
+    expired: false,
+    request: null,
+  });
+  const { config } = useAppConfig();
+  const planName = (pid: PlanId) =>
+    (config && ((lang === 'mg' && config.plans[pid].name.mg) || config.plans[pid].name.fr)) || pid;
 
   const subtypeLabels = new Set(catalog.flatMap((c) => c.subtypes.map((s) => s.label)));
 
@@ -90,7 +103,10 @@ export function GarageEditor({
           openingHours: g.openingHours ?? '',
           isOpen: g.isOpen,
           status: g.status,
+          plan: g.paidPlan,
+          planExpiresAt: g.planExpiresAt ? g.planExpiresAt.slice(0, 10) : '',
         });
+        setPlanMeta({ expired: g.planExpired, request: g.planRequest });
       });
     } else {
       api<UserItem[]>('/users').then((list) => setUsers(list.filter((u) => !u.garageId)));
@@ -147,6 +163,10 @@ export function GarageEditor({
         openingHours: draft.openingHours,
         isOpen: draft.isOpen,
         status: draft.status,
+        plan: draft.plan,
+        // Fin de journée (heure de Madagascar) pour inclure le dernier jour
+        planExpiresAt:
+          draft.plan === 'free' || !draft.planExpiresAt ? null : `${draft.planExpiresAt}T23:59:59+03:00`,
       };
       if (id) {
         await api(`/garages/${id}`, { method: 'PUT', body });
@@ -212,6 +232,72 @@ export function GarageEditor({
               </div>
             )}
           </>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 0 }}>
+        <h3>{t('plan')}</h3>
+        {planMeta.request && (
+          <div className="plan-request" style={{ marginBottom: 10 }}>
+            {t('planRequested', { p: planName(planMeta.request) })}
+          </div>
+        )}
+        {planMeta.expired && <p className="hint">{t('planExpiredHint')}</p>}
+        <div className="grid grid-2">
+          <Field label={t('plan')}>
+            <select
+              value={draft.plan}
+              onChange={(e) => {
+                const plan = e.target.value as PlanId;
+                setDraft({
+                  ...draft,
+                  plan,
+                  planExpiresAt: plan === 'free' ? '' : draft.planExpiresAt || addMonths(null, 1),
+                });
+              }}
+            >
+              {PLAN_IDS.map((pid) => (
+                <option key={pid} value={pid}>
+                  {planName(pid)}
+                  {config && config.plans[pid].price > 0
+                    ? ` — ${config.plans[pid].price.toLocaleString('fr-FR')} ${t('perMonth')}`
+                    : ''}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {draft.plan !== 'free' && (
+            <Field label={t('planExpires')} hint={draft.planExpiresAt ? undefined : t('planNoEnd')}>
+              <input
+                type="date"
+                value={draft.planExpiresAt}
+                onChange={(e) => set('planExpiresAt', e.target.value)}
+              />
+            </Field>
+          )}
+        </div>
+        {draft.plan !== 'free' && (
+          <div className="row" style={{ gap: 6 }}>
+            <PlanBadge plan={draft.plan} name={planName(draft.plan)} />
+            {[1, 3, 6, 12].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className="btn btn-sm"
+                onClick={() =>
+                  set(
+                    'planExpiresAt',
+                    addMonths(draft.planExpiresAt && !planMeta.expired ? `${draft.planExpiresAt}T12:00:00` : null, n)
+                  )
+                }
+              >
+                {t('plusMonths', { n })}
+              </button>
+            ))}
+            <button type="button" className="btn btn-sm" onClick={() => set('planExpiresAt', '')}>
+              {t('planNoEnd')}
+            </button>
+          </div>
         )}
       </div>
 

@@ -137,3 +137,24 @@ export function formatDate(iso: string, lang: string) {
     minute: '2-digit',
   });
 }
+
+export function formatDay(iso: string, lang: string) {
+  return new Date(iso).toLocaleDateString(lang === 'mg' ? 'fr-MG' : 'fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/** Ajoute des mois à une date (ou à aujourd'hui si elle est passée). Renvoie AAAA-MM-JJ. */
+export function addMonths(fromIso: string | null, months: number): string {
+  const now = new Date();
+  const from = fromIso && new Date(fromIso) > now ? new Date(fromIso) : now;
+  const d = new Date(from);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+export function PlanBadge({ plan, name }: { plan: string; name?: string }) {
+  return <span className={`plan-badge plan-${plan}`}>{name || plan}</span>;
+}

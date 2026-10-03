@@ -27,7 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
-import { configText, useAppConfig } from '../appConfig';
+import { configText, garageFeatures, useAppConfig } from '../appConfig';
 import { localized } from '../serviceCatalog';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
@@ -123,7 +123,10 @@ export function HomeScreen() {
     let list = [...garages];
     if (onlyOpen) list = list.filter((g) => isOpenNow(g));
     if (onlyFav) list = list.filter((g) => favorites.includes(g.id));
+    const boosted = (g: Garage) => (garageFeatures(g).boost && g.plan && g.plan !== 'free' ? 1 : 0);
     list.sort((a, b) => {
+      const boost = boosted(b) - boosted(a);
+      if (boost) return boost;
       if (sort === 'rating') {
         return (b.rating ?? 0) - (a.rating ?? 0);
       }

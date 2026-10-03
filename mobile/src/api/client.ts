@@ -8,6 +8,7 @@ import type {
   DailyStat,
   Garage,
   GaragesResponse,
+  PlanId,
   Quote,
   QuoteMessage,
   Review,
@@ -345,6 +346,19 @@ export async function updateGarage(
   );
   void upsertCachedGarage(garage);
   return garage;
+}
+
+/** Demande d'offre : le super admin l'active après réception du paiement. */
+export async function requestPlan(id: string, plan: PlanId): Promise<Garage> {
+  return api<Garage>(
+    `/api/garages/${id}/plan-request`,
+    { method: 'POST', body: JSON.stringify({ plan }) },
+    true
+  );
+}
+
+export async function cancelPlanRequest(id: string): Promise<Garage> {
+  return api<Garage>(`/api/garages/${id}/plan-request`, { method: 'DELETE' }, true);
 }
 
 export async function deleteGarage(id: string): Promise<void> {

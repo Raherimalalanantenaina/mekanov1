@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db/pool';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
 import { pushToClient, pushToUser } from '../push';
+import { garageFeatures } from '../plans';
 
 type ApptRow = {
   id: string;
@@ -47,6 +48,10 @@ router.post('/', async (req, res) => {
     return res
       .status(400)
       .json({ error: 'garageId, clientId, clientName, slot requis' });
+  }
+  const features = await garageFeatures(garageId);
+  if (!features?.appointments) {
+    return res.status(403).json({ error: 'Ce garage ne prend pas de rendez-vous en ligne' });
   }
   const { rows } = await query<ApptRow>(
     `INSERT INTO appointments

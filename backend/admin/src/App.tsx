@@ -11,6 +11,7 @@ import { Config } from './pages/Config';
 import { GarageForm } from './pages/GarageForm';
 import { Moderation } from './pages/Moderation';
 import { Push } from './pages/Push';
+import { Plans } from './pages/Plans';
 
 type CatalogValue = {
   catalog: Category[];
@@ -40,6 +41,7 @@ const PAGES: { path: string; label: TKey; component: React.ComponentType }[] = [
   { path: 'garages', label: 'navGarages', component: Garages },
   { path: 'accounts', label: 'navAccounts', component: Accounts },
   { path: 'config', label: 'navConfig', component: Config },
+  { path: 'plans', label: 'navPlans', component: Plans },
   { path: 'garage-form', label: 'navGarageForm', component: GarageForm },
   { path: 'moderation', label: 'navModeration', component: Moderation },
   { path: 'push', label: 'navPush', component: Push },
@@ -56,7 +58,7 @@ export function App() {
   const [email, setEmail] = useState('');
   const [path, setPath] = useState(currentPath);
   const [catalog, setCatalog] = useState<Category[]>([]);
-  const [counts, setCounts] = useState({ garages: 0, users: 0 });
+  const [counts, setCounts] = useState({ garages: 0, users: 0, plans: 0 });
 
   useEffect(() => {
     const onHash = () => setPath(currentPath());
@@ -76,7 +78,11 @@ export function App() {
   const refreshCounts = useCallback(() => {
     api<Stats>('/stats')
       .then((s) =>
-        setCounts({ garages: s.totals.garages_pending ?? 0, users: s.totals.users_pending ?? 0 })
+        setCounts({
+          garages: s.totals.garages_pending ?? 0,
+          users: s.totals.users_pending ?? 0,
+          plans: s.totals.plan_requests ?? 0,
+        })
       )
       .catch(() => {});
   }, []);
@@ -108,7 +114,13 @@ export function App() {
 
   const Page = PAGES.find((p) => p.path === path)!.component;
   const badge = (p: string) =>
-    p === 'garages' ? counts.garages : p === 'accounts' ? counts.users : 0;
+    p === 'garages'
+      ? counts.garages + counts.plans
+      : p === 'accounts'
+        ? counts.users
+        : p === 'plans'
+          ? counts.plans
+          : 0;
 
   return (
     <CatalogContext.Provider value={{ catalog, setCatalog, reloadCatalog }}>

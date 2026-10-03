@@ -11,6 +11,22 @@ export type DailyStat = {
   searches: number;
 };
 
+export type PlanId = 'free' | 'basic' | 'standard' | 'premium';
+
+export type PlanFeature =
+  | 'phone'
+  | 'route'
+  | 'photos'
+  | 'hours'
+  | 'extras'
+  | 'quotes'
+  | 'appointments'
+  | 'whatsapp'
+  | 'reviews'
+  | 'boost';
+
+export type PlanFeatures = Record<PlanFeature, boolean>;
+
 export type Garage = {
   id: string;
   ownerId?: string;
@@ -42,6 +58,14 @@ export type Garage = {
   distanceKm?: number;
   rating: number | null;
   reviewCount: number;
+  /** Offre effective (gratuite si l'abonnement a expiré) */
+  plan?: PlanId;
+  /** Fonctionnalités de l'offre (absent sur un ancien cache = tout autorisé) */
+  features?: PlanFeatures;
+  planExpiresAt?: string | null;
+  /** Offre demandée par le garagiste, en attente d'activation */
+  planRequest?: PlanId | null;
+  planRequestedAt?: string | null;
 };
 
 export type Review = {

@@ -16,6 +16,7 @@ import {
 } from '../serviceCatalog';
 import { pushBroadcast, pushToUser } from '../push';
 import { GarageRow, mapGarage, RATING_SELECT } from './garages';
+import { effectivePlanSql, isPlanId } from '../plans';
 
 const router = Router();
 
@@ -90,6 +91,7 @@ router.get(
         (SELECT COUNT(*) FROM garages WHERE status = 'pending') AS garages_pending,
         (SELECT COUNT(*) FROM garages WHERE status = 'approved') AS garages_approved,
         (SELECT COUNT(*) FROM garages WHERE status = 'hidden') AS garages_hidden,
+        (SELECT COUNT(*) FROM garages WHERE plan_request IS NOT NULL) AS plan_requests,
         (SELECT COUNT(*) FROM users) AS users_total,
         (SELECT COUNT(*) FROM users WHERE status = 'pending') AS users_pending,
         (SELECT COUNT(*) FROM users WHERE status = 'suspended') AS users_suspended,
@@ -117,8 +119,12 @@ router.get(
       `SELECT unnest(categories) AS id, COUNT(*) AS count
        FROM garages WHERE status = 'approved' GROUP BY 1`
     );
+    const byPlan = await query<{ id: string; count: string }>(
+      `SELECT ${effectivePlanSql()} AS id, COUNT(*) AS count FROM garages GROUP BY 1`
+    );
     const t = totals.rows[0];
     return res.json({
+      byPlan: byPlan.rows.map((r) => ({ id: r.id, count: Number(r.count) })),
       totals: Object.fromEntries(Object.entries(t).map(([k, v]) => [k, Number(v)])),
       daily: daily.rows.map((d) => ({
         day: d.day,
@@ -390,6 +396,12 @@ router.get(
       params.push(category);
       where.push(`$${params.length} = ANY(g.categories)`);
     }
+    const plan = String(req.query.plan || '');
+    if (isPlanId(plan)) {
+      params.push(plan);
+      where.push(`${effectivePlanSql('g')} = $${params.length}`);
+    }
+    if (req.query.planRequest === '1') where.push(`g.plan_request IS NOT NULL`);
     const { rows } = await query<{
       id: string;
       owner_id: string;
@@ -409,15 +421,20 @@ router.get(
       owner_name: string;
       owner_status: string;
       rating: string | null;
+      plan: string;
+      plan_expires_at: string | null;
+      plan_request: string | null;
+      plan_requested_at: string | null;
     }>(
       `SELECT g.id, g.owner_id, g.name, g.address, g.city, g.phone, g.categories,
               g.services, g.status, g.is_open, g.views, g.calls, g.created_at,
+              g.plan, g.plan_expires_at, g.plan_request, g.plan_requested_at,
               cardinality(g.photos) AS photo_count,
               u.email AS owner_email, u.full_name AS owner_name, u.status AS owner_status,
               (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM reviews r WHERE r.garage_id = g.id) AS rating
        FROM garages g JOIN users u ON u.id = g.owner_id
        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-       ORDER BY (g.status = 'pending') DESC, g.created_at DESC
+       ORDER BY (g.status = 'pending') DESC, (g.plan_request IS NOT NULL) DESC, g.created_at DESC
        LIMIT 500`,
       params
     );
@@ -441,6 +458,7 @@ router.get(
         ownerName: r.owner_name,
         ownerStatus: r.owner_status,
         rating: r.rating != null ? Number(r.rating) : null,
+        ...planInfo(r),
       }))
     );
   })
@@ -458,11 +476,48 @@ router.get(
     if (!rows[0]) return res.status(404).json({ error: 'Garage introuvable' });
     return res.json({
       ...mapGarage(rows[0]),
+      ...planInfo(rows[0]),
       ownerEmail: rows[0].owner_email,
       ownerName: rows[0].owner_name,
     });
   })
 );
+
+function planInfo(r: {
+  plan: string;
+  plan_expires_at: string | null;
+  plan_request: string | null;
+  plan_requested_at: string | null;
+}) {
+  const expired = !!r.plan_expires_at && new Date(r.plan_expires_at).getTime() < Date.now();
+  return {
+    plan: isPlanId(r.plan) && !expired ? r.plan : 'free',
+    /** Offre enregistrée (même expirée), pour la renouveler facilement */
+    paidPlan: isPlanId(r.plan) ? r.plan : 'free',
+    planExpiresAt: r.plan_expires_at,
+    planExpired: expired,
+    planRequest: isPlanId(r.plan_request) ? r.plan_request : null,
+    planRequestedAt: r.plan_requested_at,
+  };
+}
+
+/** Valide `plan` / `planExpiresAt` envoyés par le site admin. */
+function readPlan(b: Record<string, any>): { plan?: string; expiresAt?: string | null } | string {
+  const out: { plan?: string; expiresAt?: string | null } = {};
+  if (b.plan !== undefined) {
+    if (!isPlanId(b.plan)) return 'Offre invalide';
+    out.plan = b.plan;
+  }
+  if (b.planExpiresAt !== undefined) {
+    if (b.planExpiresAt === null || b.planExpiresAt === '') out.expiresAt = null;
+    else {
+      const d = new Date(b.planExpiresAt);
+      if (Number.isNaN(d.getTime())) return 'Date de fin d’offre invalide';
+      out.expiresAt = d.toISOString();
+    }
+  }
+  return out;
+}
 
 type AccountInput = { email?: string; fullName?: string; password?: string; status?: string };
 
@@ -507,6 +562,8 @@ router.post(
     if (!b.name?.trim() || !b.address?.trim() || b.latitude == null || b.longitude == null) {
       return res.status(400).json({ error: 'Nom, adresse, latitude et longitude requis' });
     }
+    const planInput = readPlan(b);
+    if (typeof planInput === 'string') return res.status(400).json({ error: planInput });
     let ownerId: string | undefined = b.ownerId;
     try {
       if (!ownerId) ownerId = await createAccount(b.owner ?? {});
@@ -526,8 +583,8 @@ router.post(
       `INSERT INTO garages
         (owner_id, name, description, address, city, phone, latitude, longitude,
          services, categories, photos, mobile_service, promo, price_list,
-         opening_hours, hours_json, is_open, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         opening_hours, hours_json, is_open, status, plan, plan_expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING *`,
       [
         ownerId,
@@ -548,6 +605,8 @@ router.post(
         b.hoursJson ? JSON.stringify(b.hoursJson) : null,
         b.isOpen ?? true,
         GARAGE_STATUSES.includes(b.status) ? b.status : 'approved',
+        planInput.plan ?? 'free',
+        planInput.expiresAt ?? null,
       ]
     );
     return res.status(201).json(mapGarage(rows[0]));
@@ -588,8 +647,26 @@ router.put(
     if (b.status !== undefined && !GARAGE_STATUSES.includes(b.status)) {
       return res.status(400).json({ error: 'Statut invalide' });
     }
+    const planInput = readPlan(b);
+    if (typeof planInput === 'string') return res.status(400).json({ error: planInput });
+    const currentExpiry = g.plan_expires_at ? new Date(g.plan_expires_at).toISOString() : null;
+    const planChanged =
+      (planInput.plan !== undefined && planInput.plan !== g.plan) ||
+      (planInput.expiresAt !== undefined && planInput.expiresAt !== currentExpiry);
     const sets: string[] = [];
     const params: unknown[] = [];
+    if (planInput.plan !== undefined) {
+      params.push(planInput.plan);
+      sets.push(`plan = $${params.length}`);
+    }
+    if (planInput.expiresAt !== undefined) {
+      params.push(planInput.expiresAt);
+      sets.push(`plan_expires_at = $${params.length}`);
+    }
+    // Activer / renouveler une offre traite la demande en attente
+    if (planChanged || b.clearPlanRequest === true) {
+      sets.push(`plan_request = NULL`, `plan_requested_at = NULL`);
+    }
     for (const [key, column] of Object.entries(GARAGE_FIELDS)) {
       if (b[key] === undefined || key === 'services') continue;
       let value = b[key];
@@ -620,7 +697,18 @@ router.put(
         body: `${rows[0].name} est maintenant visible par les clients.`,
       }).catch(() => {});
     }
-    return res.json(mapGarage(rows[0]));
+    if (planChanged && rows[0].plan !== 'free') {
+      const { plans } = (await getConfig()).config;
+      const name = plans[isPlanId(rows[0].plan) ? rows[0].plan : 'free'].name.fr;
+      const until = rows[0].plan_expires_at
+        ? ` jusqu’au ${new Date(rows[0].plan_expires_at).toLocaleDateString('fr-FR')}`
+        : '';
+      pushToUser(g.owner_id, {
+        title: `Offre ${name} activée 🎉`,
+        body: `${rows[0].name} profite de l’offre ${name}${until}.`,
+      }).catch(() => {});
+    }
+    return res.json({ ...mapGarage(rows[0]), ...planInfo(rows[0]) });
   })
 );
 

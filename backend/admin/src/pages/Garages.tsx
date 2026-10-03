@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { useCatalog, useRefreshCounts } from '../App';
 import { useI18n } from '../i18n';
-import type { GarageListItem, GarageStatus } from '../types';
-import { StatusBadge, useAction } from '../ui';
+import { PLAN_IDS, type GarageListItem, type GarageStatus, type PlanId } from '../types';
+import { addMonths, formatDay, PlanBadge, StatusBadge, useAction } from '../ui';
+import { useAppConfig } from '../useAppConfig';
 import { GarageEditor } from './GarageEditor';
 
 export function Garages() {
@@ -14,6 +15,10 @@ export function Garages() {
   const [list, setList] = useState<GarageListItem[] | null>(null);
   const [status, setStatus] = useState('');
   const [category, setCategory] = useState('');
+  const [plan, setPlan] = useState('');
+  const { config } = useAppConfig();
+  const planName = (id: PlanId) =>
+    (config && ((lang === 'mg' && config.plans[id].name.mg) || config.plans[id].name.fr)) || id;
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
 
@@ -21,9 +26,11 @@ export function Garages() {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (category) params.set('category', category);
+    if (plan === 'request') params.set('planRequest', '1');
+    else if (plan) params.set('plan', plan);
     if (q.trim()) params.set('q', q.trim());
     api<GarageListItem[]>(`/garages?${params}`).then(setList);
-  }, [status, category, q]);
+  }, [status, category, plan, q]);
 
   useEffect(() => {
     const timer = setTimeout(load, 250);
@@ -33,6 +40,27 @@ export function Garages() {
   const setGarageStatus = (g: GarageListItem, next: GarageStatus) =>
     run(async () => {
       await api(`/garages/${g.id}`, { method: 'PUT', body: { status: next } });
+      load();
+      refreshCounts();
+    });
+
+  const activatePlan = (g: GarageListItem, next: PlanId) =>
+    run(async () => {
+      await api(`/garages/${g.id}`, {
+        method: 'PUT',
+        body: {
+          plan: next,
+          planExpiresAt:
+            next === 'free' ? null : addMonths(g.paidPlan === next ? g.planExpiresAt : null, 1),
+        },
+      });
+      load();
+      refreshCounts();
+    }, 'planActivated');
+
+  const ignoreRequest = (g: GarageListItem) =>
+    run(async () => {
+      await api(`/garages/${g.id}`, { method: 'PUT', body: { clearPlanRequest: true } });
       load();
       refreshCounts();
     });
@@ -71,6 +99,17 @@ export function Garages() {
             </option>
           ))}
         </select>
+        <select value={plan} onChange={(e) => setPlan(e.target.value)}>
+          <option value="">
+            {t('plan')}: {t('all')}
+          </option>
+          <option value="request">{t('planRequests')}</option>
+          {PLAN_IDS.map((id) => (
+            <option key={id} value={id}>
+              {planName(id)}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
@@ -80,6 +119,7 @@ export function Garages() {
               <th>{t('name')}</th>
               <th>{t('types')}</th>
               <th>{t('owner')}</th>
+              <th>{t('plan')}</th>
               <th>{t('status')}</th>
               <th />
             </tr>
@@ -110,6 +150,29 @@ export function Garages() {
                   {g.ownerName}
                   <div className="sub">{g.ownerEmail}</div>
                   {g.ownerStatus !== 'approved' && <StatusBadge status={g.ownerStatus} />}
+                </td>
+                <td>
+                  <PlanBadge plan={g.plan} name={planName(g.plan)} />
+                  {g.planExpiresAt && g.paidPlan !== 'free' && (
+                    <div className="sub">
+                      {g.planExpired
+                        ? `${planName(g.paidPlan)} · ${t('planExpired')}`
+                        : t('planUntil', { d: formatDay(g.planExpiresAt, lang) })}
+                    </div>
+                  )}
+                  {g.planRequest && (
+                    <>
+                      <div className="plan-request">{t('planRequested', { p: planName(g.planRequest) })}</div>
+                      <div className="row" style={{ gap: 4, marginTop: 4 }}>
+                        <button className="btn btn-sm btn-primary" onClick={() => activatePlan(g, g.planRequest!)}>
+                          {t('planActivate', { p: planName(g.planRequest!) })} ({t('plusMonths', { n: 1 })})
+                        </button>
+                        <button className="btn btn-sm" onClick={() => ignoreRequest(g)}>
+                          {t('planIgnore')}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </td>
                 <td>
                   <StatusBadge status={g.status} />

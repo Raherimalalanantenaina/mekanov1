@@ -2,7 +2,8 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { query } from '../db/pool';
 import { config } from '../config';
-import { sendAdminValidationEmail } from '../mailer';
+import { sendAdminNotice, sendAdminValidationEmail } from '../mailer';
+import { boostedPlans, effectivePlanSql, effectivePlan, garageFeatures, isPlanId, withPlan } from '../plans';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
 import { getConfig } from '../appSettings';
 import {
@@ -28,6 +29,10 @@ export type GarageRow = {
   categories: string[];
   services: string[];
   photos: string[];
+  plan: string;
+  plan_expires_at: string | null;
+  plan_request: string | null;
+  plan_requested_at: string | null;
   mobile_service: boolean;
   promo: string;
   price_list: { service: string; price: string }[];
@@ -67,6 +72,10 @@ export function mapGarage(row: GarageRow) {
     hoursJson: row.hours_json ?? null,
     isOpen: row.is_open,
     status: row.status ?? 'approved',
+    plan: effectivePlan(row.plan, row.plan_expires_at),
+    planExpiresAt: row.plan_expires_at ?? null,
+    planRequest: isPlanId(row.plan_request) ? row.plan_request : null,
+    planRequestedAt: row.plan_requested_at ?? null,
     updatedAt: row.updated_at,
     createdAt: row.created_at,
     distanceKm:
@@ -172,11 +181,15 @@ router.get('/', async (req, res) => {
     orderBy = 'distance_km ASC';
   }
 
+  // Meilleure visibilité : les offres « boost » passent en tête
+  params.push(await boostedPlans());
+  const boostIdx = params.length;
+
   const sql = `
     SELECT * ${RATING_SELECT} ${distanceSelect}
     FROM garages
     WHERE ${where.join(' AND ')}
-    ORDER BY ${orderBy}
+    ORDER BY (${effectivePlanSql()} = ANY($${boostIdx}::text[])) DESC, ${orderBy}
     LIMIT 200
   `;
 
@@ -198,7 +211,7 @@ router.get('/', async (req, res) => {
   return res.json({
     syncedAt: new Date().toISOString(),
     offline: false,
-    garages: rows.map(mapGarage),
+    garages: await Promise.all(rows.map((r) => withPlan(mapGarage(r), { public: true }))),
   });
 });
 
@@ -208,7 +221,7 @@ router.get('/mine/list', requireGarageAuth, async (req: AuthedRequest, res) => {
     `SELECT * ${RATING_SELECT} FROM garages WHERE owner_id = $1 ORDER BY created_at DESC`,
     [req.user!.id]
   );
-  return res.json(rows.map(mapGarage));
+  return res.json(await Promise.all(rows.map((r) => withPlan(mapGarage(r), { public: false }))));
 });
 
 router.get('/:id', async (req, res) => {
@@ -217,7 +230,49 @@ router.get('/:id', async (req, res) => {
     [req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Garage introuvable' });
-  return res.json(mapGarage(rows[0]));
+  return res.json(await withPlan(mapGarage(rows[0]), { public: true }));
+});
+
+/** Le garagiste demande à passer à une autre offre (activée par le super admin après paiement). */
+router.post('/:id/plan-request', requireGarageAuth, async (req: AuthedRequest, res) => {
+  const { plan } = req.body as { plan?: string };
+  if (!isPlanId(plan)) return res.status(400).json({ error: 'Offre invalide' });
+  const { rows } = await query<GarageRow & { owner_email: string; owner_name: string }>(
+    `SELECT g.*, u.email AS owner_email, u.full_name AS owner_name
+     FROM garages g JOIN users u ON u.id = g.owner_id WHERE g.id = $1`,
+    [req.params.id]
+  );
+  const g = rows[0];
+  if (!g) return res.status(404).json({ error: 'Garage introuvable' });
+  if (g.owner_id !== req.user!.id) return res.status(403).json({ error: 'Non autorisé' });
+
+  const updated = await query<GarageRow>(
+    `UPDATE garages SET plan_request = $2, plan_requested_at = NOW() WHERE id = $1 RETURNING *`,
+    [g.id, plan]
+  );
+  const { plans } = (await getConfig()).config;
+  sendAdminNotice({
+    subject: `Demande d’offre ${plans[plan].name.fr}`,
+    intro: 'Un garagiste demande à changer d’offre. Active-la depuis le site super admin après réception du paiement.',
+    details: {
+      Garage: g.name,
+      'Offre actuelle': plans[effectivePlan(g.plan, g.plan_expires_at)].name.fr,
+      'Offre demandée': `${plans[plan].name.fr} (${plans[plan].price.toLocaleString('fr-FR')} Ar/mois)`,
+      Propriétaire: `${g.owner_name} (${g.owner_email})`,
+      Téléphone: g.phone || '—',
+    },
+  }).catch(() => {});
+  return res.json(await withPlan(mapGarage(updated.rows[0]), { public: false }));
+});
+
+router.delete('/:id/plan-request', requireGarageAuth, async (req: AuthedRequest, res) => {
+  const { rows } = await query<GarageRow>(
+    `UPDATE garages SET plan_request = NULL, plan_requested_at = NULL
+     WHERE id = $1 AND owner_id = $2 RETURNING *`,
+    [req.params.id, req.user!.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Garage introuvable' });
+  return res.json(await withPlan(mapGarage(rows[0]), { public: false }));
 });
 
 /** Compteurs de statistiques (vue de fiche / appel) */
@@ -284,6 +339,8 @@ router.get(
 
 /** Avis */
 router.get('/:id/reviews', async (req, res) => {
+  const features = await garageFeatures(req.params.id);
+  if (!features?.reviews) return res.json([]);
   const { rows } = await query(
     `SELECT id, author_name, rating, comment, created_at
      FROM reviews WHERE garage_id = $1
@@ -317,6 +374,10 @@ router.post('/:id/reviews', async (req, res) => {
     return res
       .status(400)
       .json({ error: 'authorName et rating (1-5) requis' });
+  }
+  const features = await garageFeatures(req.params.id);
+  if (!features?.reviews) {
+    return res.status(403).json({ error: 'Les avis ne sont pas disponibles pour ce garage' });
   }
   const { rows } = await query(
     `INSERT INTO reviews (garage_id, author_name, rating, comment)
@@ -436,7 +497,7 @@ router.post('/', requireGarageAuth, async (req: AuthedRequest, res) => {
     rejectUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/reject`,
   });
 
-  return res.status(201).json(mapGarage(rows[0]));
+  return res.status(201).json(await withPlan(mapGarage(rows[0]), { public: false }));
 });
 
 router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
@@ -494,7 +555,7 @@ router.put('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {
       categories,
     ]
   );
-  return res.json(mapGarage(rows[0]));
+  return res.json(await withPlan(mapGarage(rows[0]), { public: false }));
 });
 
 router.delete('/:id', requireGarageAuth, async (req: AuthedRequest, res) => {

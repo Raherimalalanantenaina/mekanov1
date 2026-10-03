@@ -6,7 +6,7 @@ import { BouncyPressable } from './Pressable';
 import { useTheme } from '../context/ThemeContext';
 import { isOpenNow } from '../hours';
 import { useI18n } from '../i18n';
-import { useAppConfig } from '../appConfig';
+import { garageFeatures, useAppConfig } from '../appConfig';
 import { categoryLabel, garageCategoryIds } from '../serviceCatalog';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
@@ -54,12 +54,14 @@ export function GarageCard({
 }: Props) {
   const { colors } = useTheme();
   const { t, lang } = useI18n();
-  useAppConfig();
+  const { config } = useAppConfig();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const pf = garageFeatures(garage);
+  const showRating = config.features.reviews && pf.reviews;
   return (
     <Animated.View entering={FadeInDown.duration(320)}>
     <BouncyPressable onPress={onPress} style={styles.card}>
-      {garage.photos?.[0] ? (
+      {pf.photos && garage.photos?.[0] ? (
         <Image
           source={{ uri: garage.photos[0] }}
           style={styles.iconWrap}
@@ -76,6 +78,9 @@ export function GarageCard({
           <Text style={styles.name} numberOfLines={1}>
             {garage.name}
           </Text>
+          {pf.boost && garage.plan && garage.plan !== 'free' && (
+            <Ionicons name="ribbon" size={14} color={colors.amberDark} style={{ marginRight: 4 }} />
+          )}
           {onToggleFavorite && (
             <BouncyPressable onPress={onToggleFavorite} style={styles.favBtn}>
               <Ionicons
@@ -87,7 +92,7 @@ export function GarageCard({
           )}
         </View>
 
-        <Stars rating={garage.rating} styles={styles} colors={colors} />
+        {showRating && <Stars rating={garage.rating} styles={styles} colors={colors} />}
 
         <View style={styles.rowInfo}>
           <Ionicons name="location" size={12} color={colors.amberDark} />
@@ -99,7 +104,7 @@ export function GarageCard({
           </Text>
         </View>
 
-        {!!garage.promo && (
+        {pf.extras && !!garage.promo && (
           <View style={styles.promo}>
             <Ionicons name="pricetag" size={11} color={colors.danger} />
             <Text style={styles.promoText} numberOfLines={1}>
@@ -139,7 +144,7 @@ export function GarageCard({
               {isOpenNow(garage) ? t('openNowBadge') : t('closedNowBadge')}
             </Text>
           </View>
-          {garage.mobileService && (
+          {pf.extras && garage.mobileService && (
             <View style={styles.mobileBadge}>
               <Ionicons name="car" size={10} color={colors.teal} />
               <Text style={styles.mobileText}>{t('movesAround')}</Text>

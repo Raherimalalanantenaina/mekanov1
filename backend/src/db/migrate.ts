@@ -142,6 +142,14 @@ CREATE TABLE IF NOT EXISTS service_subtypes (
 );
 CREATE INDEX IF NOT EXISTS idx_subtypes_category ON service_subtypes (category_id);
 
+-- Offres (free / basic / standard / premium). Les garages déjà en ligne
+-- passent en premium sans date de fin ; les nouveaux démarrent en gratuit.
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'premium';
+ALTER TABLE garages ALTER COLUMN plan SET DEFAULT 'free';
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ;
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_request TEXT;
+ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_requested_at TIMESTAMPTZ;
+
 -- Configuration de l'app (clé 'app' = JSON de config, clé 'logo' = data URL)
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,

@@ -35,6 +35,7 @@ import { useI18n } from '../i18n';
 import { garageMatches } from '../serviceCatalog';
 import { mapStyleFor, circlePolygon, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
+import { garageFeatures } from '../appConfig';
 import type { Garage } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -414,7 +415,7 @@ export function MapScreen() {
           exiting={FadeOut.duration(150)}
           style={[styles.sheet, shadow.float, { bottom: 16 + insets.bottom }]}
         >
-          {selected.photos?.[0] ? (
+          {garageFeatures(selected).photos && selected.photos?.[0] ? (
             <Image source={{ uri: selected.photos[0] }} style={styles.sheetPhoto} />
           ) : (
             <View style={styles.sheetIcon}>

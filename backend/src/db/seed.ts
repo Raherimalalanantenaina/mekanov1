@@ -17,6 +17,7 @@ const samples = [
     latitude: -18.8792,
     longitude: 47.5079,
     services: ['Vidange', 'Freinage', 'Moteur'],
+    plan: 'premium',
   },
   {
     email: 'garage2@mekano.app',
@@ -29,6 +30,7 @@ const samples = [
     latitude: -18.9036,
     longitude: 47.5215,
     services: ['Recharge clim', 'Réparation clim'],
+    plan: 'standard',
   },
   {
     email: 'garage3@mekano.app',
@@ -41,6 +43,7 @@ const samples = [
     latitude: -18.7969,
     longitude: 47.4788,
     services: ['Intervention sur route', 'Remorquage'],
+    plan: 'basic',
   },
   {
     email: 'garage4@mekano.app',
@@ -53,6 +56,7 @@ const samples = [
     latitude: -18.1492,
     longitude: 49.4023,
     services: ['Crevaison', 'Réparation pneu', 'Montage pneu'],
+    plan: 'free',
   },
 ];
 
@@ -110,8 +114,8 @@ async function seed() {
     } else {
       await pool.query(
         `INSERT INTO garages
-          (owner_id, name, description, address, city, phone, latitude, longitude, services, categories, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'approved')`,
+          (owner_id, name, description, address, city, phone, latitude, longitude, services, categories, status, plan)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'approved',$11)`,
         [
           ownerId,
           g.name,
@@ -123,6 +127,7 @@ async function seed() {
           g.longitude,
           g.services,
           categories,
+          g.plan,
         ]
       );
     }

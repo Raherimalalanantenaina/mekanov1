@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db/pool';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
 import { pushToClient, pushToUser } from '../push';
+import { garageFeatures } from '../plans';
 
 type QuoteRow = {
   id: string;
@@ -57,6 +58,10 @@ router.post('/', async (req, res) => {
     return res
       .status(400)
       .json({ error: 'garageId, clientId, clientName, description requis' });
+  }
+  const features = await garageFeatures(garageId);
+  if (!features?.quotes) {
+    return res.status(403).json({ error: 'Ce garage ne reçoit pas de demandes de devis' });
   }
   const { rows } = await query<QuoteRow>(
     `INSERT INTO quote_requests

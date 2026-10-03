@@ -74,3 +74,39 @@ export async function sendAdminValidationEmail(opts: {
     console.log(`Lien de validation (secours) : ${opts.approveUrl}`);
   }
 }
+
+/** Email d'information à l'administrateur (sans boutons Valider / Refuser). */
+export async function sendAdminNotice(opts: {
+  subject: string;
+  intro: string;
+  details: Record<string, string>;
+}) {
+  const detailRows = Object.entries(opts.details)
+    .map(
+      ([k, v]) =>
+        `<tr><td style="padding:4px 12px 4px 0;color:#666;">${k}</td><td style="padding:4px 0;"><strong>${v}</strong></td></tr>`
+    )
+    .join('');
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;">
+      <h2 style="color:#0f766e;">Mekano — ${opts.subject}</h2>
+      <p>${opts.intro}</p>
+      <table style="border-collapse:collapse;margin:12px 0;">${detailRows}</table>
+      <p><a href="${config.publicUrl}/admin/" style="color:#0f766e;">Ouvrir le site super admin</a></p>
+    </div>`;
+
+  if (!transporter) {
+    console.log(`[MAIL non configuré] ${opts.subject} — ${JSON.stringify(opts.details)}`);
+    return;
+  }
+  try {
+    await transporter.sendMail({
+      from: `"Mekano" <${config.smtp.user}>`,
+      to: config.adminEmail,
+      subject: `Mekano — ${opts.subject}`,
+      html,
+    });
+  } catch (err) {
+    console.error('Échec envoi email admin :', err);
+  }
+}

@@ -12,6 +12,34 @@ export const GARAGE_FORM_FIELDS = [
 ] as const;
 
 export type GarageFormField = (typeof GARAGE_FORM_FIELDS)[number];
+
+export const PLAN_IDS = ['free', 'basic', 'standard', 'premium'] as const;
+export type PlanId = (typeof PLAN_IDS)[number];
+
+/** Fonctionnalités activables par offre. `extras` = promo, tarifs, déplacement. */
+export const PLAN_FEATURES = [
+  'phone',
+  'route',
+  'photos',
+  'hours',
+  'extras',
+  'quotes',
+  'appointments',
+  'whatsapp',
+  'reviews',
+  'boost',
+] as const;
+export type PlanFeature = (typeof PLAN_FEATURES)[number];
+export type PlanFeatures = Record<PlanFeature, boolean>;
+
+export type Plan = {
+  name: { fr: string; mg: string };
+  /** Prix mensuel en ariary (0 = gratuit) */
+  price: number;
+  /** Nombre de sous-types affichés publiquement (0 = illimité) */
+  maxServices: number;
+  features: PlanFeatures;
+};
 export type LocalizedText = { fr: string; mg: string };
 export type FieldRule = { visible: boolean; required: boolean };
 
@@ -38,9 +66,41 @@ export type AppConfig = {
   };
   approval: { accounts: boolean; garages: boolean };
   support: { phone: string; email: string };
+  plans: Record<PlanId, Plan>;
 };
 
 const empty = (): LocalizedText => ({ fr: '', mg: '' });
+
+function features(on: PlanFeature[]): PlanFeatures {
+  return Object.fromEntries(PLAN_FEATURES.map((f) => [f, on.includes(f)])) as PlanFeatures;
+}
+
+export const DEFAULT_PLANS: Record<PlanId, Plan> = {
+  free: {
+    name: { fr: 'Gratuite', mg: 'Maimaim-poana' },
+    price: 0,
+    maxServices: 3,
+    features: features(['phone']),
+  },
+  basic: {
+    name: { fr: 'Basique', mg: 'Fototra' },
+    price: 5000,
+    maxServices: 3,
+    features: features(['phone', 'route']),
+  },
+  standard: {
+    name: { fr: 'Standard', mg: 'Standard' },
+    price: 15000,
+    maxServices: 0,
+    features: features(['phone', 'route', 'photos', 'hours', 'extras']),
+  },
+  premium: {
+    name: { fr: 'Premium', mg: 'Premium' },
+    price: 30000,
+    maxServices: 0,
+    features: features([...PLAN_FEATURES]),
+  },
+};
 
 export const DEFAULT_CONFIG: AppConfig = {
   appName: 'Mekano',
@@ -74,6 +134,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   approval: { accounts: true, garages: true },
   support: { phone: '', email: '' },
+  plans: DEFAULT_PLANS,
 };
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -103,6 +164,7 @@ export function sanitizeConfig(input: unknown, base: AppConfig = DEFAULT_CONFIG)
   const fields = form.fields ?? {};
   const approval = i.approval ?? {};
   const support = i.support ?? {};
+  const plans = i.plans ?? {};
   const maxPhotos = Number(form.maxPhotos);
   const minCategories = Number(form.minCategories);
   return {
@@ -150,6 +212,29 @@ export function sanitizeConfig(input: unknown, base: AppConfig = DEFAULT_CONFIG)
       phone: str(support.phone, base.support.phone, 40),
       email: str(support.email, base.support.email, 120),
     },
+    plans: Object.fromEntries(
+      PLAN_IDS.map((id) => {
+        const b = base.plans?.[id] ?? DEFAULT_PLANS[id];
+        const p = plans[id] ?? {};
+        const price = Number(p.price);
+        const maxServices = Number(p.maxServices);
+        const f = p.features ?? {};
+        return [
+          id,
+          {
+            name: text(p.name, b.name),
+            price: Number.isFinite(price) && price >= 0 ? Math.round(price) : b.price,
+            maxServices:
+              Number.isFinite(maxServices) && maxServices >= 0 && maxServices <= 50
+                ? Math.round(maxServices)
+                : b.maxServices,
+            features: Object.fromEntries(
+              PLAN_FEATURES.map((k) => [k, bool(f[k], b.features[k])])
+            ) as PlanFeatures,
+          },
+        ];
+      })
+    ) as Record<PlanId, Plan>,
   };
 }
 

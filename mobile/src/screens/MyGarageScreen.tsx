@@ -27,13 +27,14 @@ import {
 import { GarageCard } from '../components/GarageCard';
 import { LocationPicker, type Coords } from '../components/LocationPicker';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { PlanSection } from '../components/PlanSection';
 import { BouncyPressable } from '../components/Pressable';
 import { StatsChart } from '../components/StatsChart';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { defaultWeek, summarizeWeek } from '../hours';
-import { useI18n } from '../i18n';
-import { useAppConfig } from '../appConfig';
+import { useI18n, type TKey } from '../i18n';
+import { garageFeatures, useAppConfig } from '../appConfig';
 import { garageCategoryIds, localized } from '../serviceCatalog';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { DailyStat, DayHours, Garage } from '../types';
@@ -354,6 +355,19 @@ export function MyGarageScreen() {
     ]);
   };
 
+  // Offre de la fiche en cours d'édition (une nouvelle fiche démarre en gratuit)
+  const formPlan = config.plans[editing?.plan ?? 'free'];
+  const formFeatures = editing ? garageFeatures(editing) : formPlan.features;
+  const hiddenByPlan = (
+    [
+      ['photos', form.fields.photos.visible],
+      ['hours', form.fields.hours.visible],
+      ['extras', form.fields.promo.visible || form.fields.prices.visible || form.fields.mobileService.visible],
+    ] as const
+  )
+    .filter(([f, shown]) => shown && !formFeatures[f])
+    .map(([f]) => t(`pf_${f}` as TKey).toLowerCase());
+
   const accountPending = user.status === 'pending';
   const hasGarage = mine.length >= 1;
   const showForm = !accountPending && (Boolean(editing) || !hasGarage);
@@ -416,6 +430,14 @@ export function MyGarageScreen() {
               )}
             </View>
 
+            {hiddenByPlan.length > 0 && (
+              <View style={styles.planHint}>
+                <Ionicons name="lock-closed-outline" size={14} color={colors.amberDark} />
+                <Text style={styles.planHintText}>
+                  {t('planLockedHint', { list: hiddenByPlan.join(', ') })}
+                </Text>
+              </View>
+            )}
             <Input
               icon="business-outline"
               placeholder={t('garageName')}
@@ -542,6 +564,11 @@ export function MyGarageScreen() {
 
             {/* Types de service puis sous-types */}
             <Text style={styles.sectionLabel}>{t('serviceTypesHint')}</Text>
+            {formPlan.maxServices > 0 && (
+              <Text style={styles.planServicesHint}>
+                {t('planServicesHint', { n: formPlan.maxServices })}
+              </Text>
+            )}
             <View style={styles.categoriesBox}>
               {catalog.map((c, i) => {
                 const catOn = categories.includes(c.id);
@@ -765,6 +792,7 @@ export function MyGarageScreen() {
               </BouncyPressable>
             </View>
             <StatsChart data={stats} />
+            <PlanSection garage={item} onChanged={reload} />
           </View>
         )}
       />
@@ -791,6 +819,17 @@ const createStyles = (colors: ThemeColors) =>
     letterSpacing: -0.6,
   },
   heroSub: { color: colors.muted, fontSize: 12.5, marginTop: 4 },
+  planHint: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: colors.amberSoft,
+    borderRadius: radii.sm,
+    padding: 10,
+    marginBottom: 12,
+  },
+  planHintText: { flex: 1, color: colors.ink, fontSize: 12, lineHeight: 17 },
+  planServicesHint: { color: colors.muted, fontSize: 11.5, marginTop: -4, marginBottom: 8 },
   form: {
     backgroundColor: colors.bg,
     borderWidth: 1,

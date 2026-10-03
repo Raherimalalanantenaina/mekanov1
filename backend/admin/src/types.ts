@@ -28,6 +28,39 @@ export type FormField = (typeof FORM_FIELDS)[number];
 export const FEATURES = ['quotes', 'appointments', 'reviews', 'sos', 'whatsapp', 'share'] as const;
 export type Feature = (typeof FEATURES)[number];
 
+export const PLAN_IDS = ['free', 'basic', 'standard', 'premium'] as const;
+export type PlanId = (typeof PLAN_IDS)[number];
+
+export const PLAN_FEATURES = [
+  'phone',
+  'route',
+  'photos',
+  'hours',
+  'extras',
+  'quotes',
+  'appointments',
+  'whatsapp',
+  'reviews',
+  'boost',
+] as const;
+export type PlanFeature = (typeof PLAN_FEATURES)[number];
+
+export type Plan = {
+  name: LocalizedText;
+  price: number;
+  maxServices: number;
+  features: Record<PlanFeature, boolean>;
+};
+
+export type PlanInfo = {
+  plan: PlanId;
+  paidPlan: PlanId;
+  planExpiresAt: string | null;
+  planExpired: boolean;
+  planRequest: PlanId | null;
+  planRequestedAt: string | null;
+};
+
 export type AppConfig = {
   appName: string;
   colors: { primary: string; accent: string };
@@ -44,6 +77,7 @@ export type AppConfig = {
   };
   approval: { accounts: boolean; garages: boolean };
   support: { phone: string; email: string };
+  plans: Record<PlanId, Plan>;
 };
 
 export type GarageStatus = 'pending' | 'approved' | 'hidden';
@@ -68,7 +102,7 @@ export type GarageListItem = {
   ownerName: string;
   ownerStatus: UserStatus;
   rating: number | null;
-};
+} & PlanInfo;
 
 export type PriceItem = { service: string; price: string };
 
@@ -93,7 +127,7 @@ export type GarageDetail = {
   status: GarageStatus;
   ownerEmail?: string;
   ownerName?: string;
-};
+} & PlanInfo;
 
 export type UserItem = {
   id: string;
@@ -111,6 +145,7 @@ export type Stats = {
   daily: { day: string; views: number; calls: number; searches: number }[];
   top: { id: string; name: string; city: string; views: number; calls: number }[];
   byCategory: { id: string; count: number }[];
+  byPlan: { id: PlanId; count: number }[];
 };
 
 export type Review = {
