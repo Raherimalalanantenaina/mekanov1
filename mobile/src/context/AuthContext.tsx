@@ -16,6 +16,7 @@ import {
   register as apiRegister,
 } from '../api/client';
 import type { AuthUser, Garage } from '../types';
+import { resetAccountSync, syncNow, useSync } from '../sync';
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -57,6 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Validation, suspension, offre… modifiées dans le back-office
+  useSync(['account'], () => {
+    if (user) refreshUser();
+  });
+
   useEffect(() => {
     (async () => {
       const cached = await getCachedUser();
@@ -81,16 +87,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await apiLogin(email, password);
         setUser(data.user);
         setOffline(false);
+        resetAccountSync();
+        syncNow();
       },
       register: async (email, password, fullName, garage) => {
         const data = await apiRegister(email, password, fullName, garage);
         setUser(data.user);
         setOffline(false);
+        resetAccountSync();
+        syncNow();
         return data.garage ?? null;
       },
       logout: async () => {
         await clearSession();
         setUser(null);
+        resetAccountSync();
       },
       refreshUser,
     }),

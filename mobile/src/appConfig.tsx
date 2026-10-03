@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from './config';
+import { useSync } from './sync';
 import type { Lang } from './i18n';
 import { DEFAULT_CATALOG, setCatalog, type ServiceCategory } from './serviceCatalog';
 import type { Garage, PlanFeature, PlanFeatures, PlanId } from './types';
@@ -215,6 +216,23 @@ function toValue(remote: RemoteConfig): AppConfigValue {
 
 export function AppConfigProvider({ children }: { children: React.ReactNode }) {
   const [value, setValue] = useState<AppConfigValue>(initial);
+
+  const refresh = useCallback(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    fetch(`${API_BASE_URL}/api/config`, { signal: controller.signal })
+      .then((res) => (res.ok ? (res.json() as Promise<RemoteConfig>) : null))
+      .then((remote) => {
+        if (!remote) return;
+        setValue((current) => (current.version === remote.version ? current : toValue(remote)));
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(remote)).catch(() => {});
+      })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
+  }, []);
+
+  // Config, catalogue ou logo modifiés dans le back-office
+  useSync(['config'], refresh);
 
   useEffect(() => {
     let cancelled = false;

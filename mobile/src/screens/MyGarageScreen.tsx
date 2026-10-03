@@ -39,6 +39,7 @@ import { garageCategoryIds, localized } from '../serviceCatalog';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { DailyStat, DayHours, Garage } from '../types';
 import { notify } from '../components/Notifier';
+import { useSync } from '../sync';
 
 function Input({
   icon,
@@ -60,7 +61,7 @@ function Input({
   );
 }
 
-export function MyGarageScreen() {
+export function MyGarageScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const { user, offline, refreshUser } = useAuth();
   const { colors } = useTheme();
   const { t, lang } = useI18n();
@@ -206,6 +207,11 @@ export function MyGarageScreen() {
       reload();
     }, [reload])
   );
+
+  // Statut, offre ou fiche modifiés depuis le back-office
+  useSync(['account'], () => {
+    reload();
+  });
 
   if (!user) {
     return (
@@ -376,15 +382,17 @@ export function MyGarageScreen() {
 
   return (
     <View style={styles.root}>
-      <View
-        style={[
-          styles.hero,
-          { paddingTop: insets.top + 16, paddingHorizontal: pad },
-        ]}
-      >
-        <Text style={styles.heroTitle}>{t('myGarageTitle')}</Text>
-        <Text style={styles.heroSub}>{t('myGarageSub')}</Text>
-      </View>
+      {!embedded && (
+        <View
+          style={[
+            styles.hero,
+            { paddingTop: insets.top + 16, paddingHorizontal: pad },
+          ]}
+        >
+          <Text style={styles.heroTitle}>{t('myGarageTitle')}</Text>
+          <Text style={styles.heroSub}>{t('myGarageSub')}</Text>
+        </View>
+      )}
 
       <OfflineBanner offline={offline} />
 

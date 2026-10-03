@@ -38,6 +38,7 @@ import { font, radii, shadow, type ThemeColors } from '../theme';
 import { garageFeatures } from '../appConfig';
 import type { Garage } from '../types';
 import type { RootStackParamList } from '../navigation/types';
+import { useSync } from '../sync';
 
 const DEFAULT_CENTER: [number, number] = [47.5079, -18.8792];
 
@@ -110,6 +111,15 @@ export function MapScreen() {
       })();
     }, [])
   );
+
+  useSync(['garages'], () => {
+    fetchGarages(userPos ? { lat: userPos.latitude, lng: userPos.longitude } : {})
+      .then((data) => {
+        setGarages(data.garages);
+        setIsOfflineData(data.offline);
+      })
+      .catch(() => {});
+  });
 
   /** Distance calculée localement si absente (cache hors ligne). */
   const withDistance = useMemo(() => {

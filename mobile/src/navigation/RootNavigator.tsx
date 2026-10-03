@@ -8,11 +8,9 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { GarageDetailScreen } from '../screens/GarageDetailScreen';
 import { GarageAuthScreen } from '../screens/GarageAuthScreen';
-import { MyGarageScreen } from '../screens/MyGarageScreen';
 import { RequestsScreen } from '../screens/RequestsScreen';
-import { GarageInboxScreen } from '../screens/GarageInboxScreen';
+import { GarageSpaceScreen } from '../screens/GarageSpaceScreen';
 import { RouteScreen } from '../screens/RouteScreen';
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
 import { useAppConfig } from '../appConfig';
@@ -23,7 +21,6 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function MainTabs() {
-  const { user } = useAuth();
   const { t } = useI18n();
   const { features } = useAppConfig().config;
   const { colors } = useTheme();
@@ -57,8 +54,7 @@ function MainTabs() {
             Liste: focused ? 'list' : 'list-outline',
             Carte: focused ? 'map' : 'map-outline',
             Demandes: focused ? 'chatbubbles' : 'chatbubbles-outline',
-            Publier: focused ? 'add-circle' : 'add-circle-outline',
-            Inbox: focused ? 'mail' : 'mail-outline',
+            Publier: focused ? 'business' : 'business-outline',
             Garage: focused ? 'person' : 'person-outline',
           };
           return (
@@ -90,16 +86,9 @@ function MainTabs() {
       ) : null}
       <Tab.Screen
         name="Publier"
-        component={MyGarageScreen}
+        component={GarageSpaceScreen}
         options={{ tabBarLabel: t('tabPublish') }}
       />
-      {user ? (
-        <Tab.Screen
-          name="Inbox"
-          component={GarageInboxScreen}
-          options={{ tabBarLabel: 'Inbox' }}
-        />
-      ) : null}
       <Tab.Screen
         name="Garage"
         component={GarageAuthScreen}

@@ -32,6 +32,7 @@ import { font, radii, type ThemeColors } from '../theme';
 import type { Garage } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 import { notify } from '../components/Notifier';
+import { useSync } from '../sync';
 
 type SortMode = 'distance' | 'rating';
 type Styles = ReturnType<typeof createStyles>;
@@ -170,6 +171,9 @@ export function HomeScreen() {
       load();
     }, [load])
   );
+
+  // Garage validé, fiche modifiée, offre activée… : rechargement discret
+  useSync(['garages'], () => load());
 
   const search = (text = q) => {
     setLoading(true);

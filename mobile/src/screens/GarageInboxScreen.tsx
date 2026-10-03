@@ -24,10 +24,11 @@ import { useI18n } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Appointment, Quote, QuoteMessage } from '../types';
 import { notify } from '../components/Notifier';
+import { useSync } from '../sync';
 
 type Tab = 'quotes' | 'bookings';
 
-export function GarageInboxScreen() {
+export function GarageInboxScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -40,9 +41,9 @@ export function GarageInboxScreen() {
   const [openQuote, setOpenQuote] = useState<Quote | null>(null);
   const [messages, setMessages] = useState<QuoteMessage[]>([]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (silent = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [q, a] = await Promise.all([
         fetchReceivedQuotes(),
@@ -84,6 +85,12 @@ export function GarageInboxScreen() {
     }, [openQuote])
   );
 
+  // Nouveau devis, message ou rendez-vous : mise à jour en direct
+  useSync(['inbox'], () => {
+    reload(true);
+    if (openQuote) fetchQuoteMessages(openQuote.id).then(setMessages).catch(() => {});
+  });
+
   if (!user) {
     return (
       <View style={[styles.root, styles.center]}>
@@ -121,7 +128,7 @@ export function GarageInboxScreen() {
 
   if (openQuote) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: embedded ? 0 : insets.top }]}>
         <View style={styles.chatHead}>
           <BouncyPressable onPress={() => setOpenQuote(null)}>
             <Ionicons name="arrow-back" size={22} color={colors.ink} />
@@ -148,9 +155,11 @@ export function GarageInboxScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.head, { paddingTop: insets.top + 14 }]}>
-        <Text style={styles.title}>{t('inboxTitle')}</Text>
-      </View>
+      {!embedded && (
+        <View style={[styles.head, { paddingTop: insets.top + 14 }]}>
+          <Text style={styles.title}>{t('inboxTitle')}</Text>
+        </View>
+      )}
       <View style={styles.tabs}>
         <BouncyPressable
           onPress={() => setTab('quotes')}

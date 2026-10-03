@@ -10,6 +10,7 @@ import { MekanoLogo } from './src/components/MekanoLogo';
 import { NotifierProvider } from './src/components/Notifier';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { registerForPush } from './src/push';
+import { SyncRunner } from './src/sync';
 
 function Boot() {
   const { loading, user } = useAuth();
@@ -35,6 +36,7 @@ function Boot() {
         backgroundColor="transparent"
       />
       <RootNavigator />
+      <SyncRunner />
     </>
   );
 }

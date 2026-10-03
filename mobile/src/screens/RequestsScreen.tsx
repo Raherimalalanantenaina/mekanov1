@@ -16,6 +16,7 @@ import {
   sendQuoteMessage,
 } from '../api/client';
 import { ChatThread } from '../components/ChatThread';
+import { useSync } from '../sync';
 import { BouncyPressable } from '../components/Pressable';
 import { useI18n } from '../i18n';
 import { useTheme } from '../context/ThemeContext';
@@ -36,8 +37,8 @@ export function RequestsScreen() {
   const [openQuote, setOpenQuote] = useState<Quote | null>(null);
   const [messages, setMessages] = useState<QuoteMessage[]>([]);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [q, a] = await Promise.all([
         fetchMyQuotes(),
@@ -73,6 +74,12 @@ export function RequestsScreen() {
       };
     }, [openQuote])
   );
+
+  // Réponse du garage, rendez-vous accepté… : mise à jour en direct
+  useSync(['client'], () => {
+    reload(true);
+    if (openQuote) fetchQuoteMessages(openQuote.id).then(setMessages).catch(() => {});
+  });
 
   const openChat = async (q: Quote) => {
     setOpenQuote(q);

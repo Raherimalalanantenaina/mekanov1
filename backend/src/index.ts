@@ -1,3 +1,4 @@
+import './asyncErrors';
 import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
@@ -11,6 +12,7 @@ import adminRoutes from './routes/admin';
 import pushRoutes from './routes/push';
 import configRoutes from './routes/config';
 import superAdminRoutes from './routes/superadmin';
+import syncRoutes from './routes/sync';
 import { loadCatalog } from './serviceCatalog';
 
 const app = express();
@@ -33,6 +35,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/sync', syncRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 
 // Site web super admin (build Vite de backend/admin)
@@ -49,7 +52,12 @@ app.use(
     res: express.Response,
     _next: express.NextFunction
   ) => {
+    // Identifiant mal formé (ex. /api/garages/abc) : erreur client, pas serveur
+    if ((err as { code?: string }).code === '22P02') {
+      return res.status(400).json({ error: 'Identifiant invalide' });
+    }
     console.error(err);
+    if (res.headersSent) return;
     res.status(500).json({ error: 'Erreur serveur' });
   }
 );

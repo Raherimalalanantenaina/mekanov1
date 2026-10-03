@@ -40,6 +40,7 @@ import { font, radii, shadow, type ThemeColors } from '../theme';
 import type { Garage, Review } from '../types';
 import type { RootStackParamList } from '../navigation/types';
 import { notify } from '../components/Notifier';
+import { useSync } from '../sync';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GarageDetail'>;
 
@@ -122,6 +123,11 @@ export function GarageDetailScreen({ route, navigation }: Props) {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Erreur'));
   }, [id]);
+
+  useSync(['garages'], () => {
+    fetchGarageById(id).then(setGarage).catch(() => {});
+    fetchReviews(id).then(setReviews).catch(() => {});
+  });
 
   if (error) {
     return (
