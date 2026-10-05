@@ -4,7 +4,13 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../db/pool';
 import { config } from '../config';
-import { requireSuperAdmin, SuperAdminRequest } from '../middleware/auth';
+import {
+  ADMIN_PERMISSIONS,
+  AdminPermission,
+  hasPermission,
+  requireSuperAdmin,
+  SuperAdminRequest,
+} from '../middleware/auth';
 import { getConfig, getLogoVersion, saveConfig, saveLogo } from '../appSettings';
 import {
   getFullCatalog,
@@ -43,12 +49,7 @@ router.post(
   '/login',
   h(async (req, res) => {
     const { email, password } = req.body as { email?: string; password?: string };
-    if (!config.superAdmin.email || !config.superAdmin.password) {
-      return res.status(503).json({
-        error:
-          'Super admin non configuré : définis SUPERADMIN_EMAIL et SUPERADMIN_PASSWORD sur le serveur.',
-      });
-    }
+    const mail = (email ?? '').toLowerCase().trim();
     const ip = req.ip ?? 'unknown';
     const entry = attempts.get(ip);
     if (entry && entry.count >= MAX_ATTEMPTS && entry.until > Date.now()) {
@@ -56,29 +57,215 @@ router.post(
         .status(429)
         .json({ error: 'Trop de tentatives. Réessaie dans 15 minutes.' });
     }
-    const ok =
-      sameSecret((email ?? '').toLowerCase().trim(), config.superAdmin.email) &&
-      sameSecret(password ?? '', config.superAdmin.password);
-    if (!ok) {
+    const fail = () => {
       const count = entry && entry.until > Date.now() ? entry.count + 1 : 1;
       attempts.set(ip, { count, until: Date.now() + LOCK_MS });
       return res.status(401).json({ error: 'Identifiants invalides' });
+    };
+
+    // Super admin : identifiants définis sur le serveur
+    if (
+      config.superAdmin.email &&
+      config.superAdmin.password &&
+      sameSecret(mail, config.superAdmin.email)
+    ) {
+      if (!sameSecret(password ?? '', config.superAdmin.password)) return fail();
+      attempts.delete(ip);
+      const token = jwt.sign(
+        { role: 'superadmin', email: config.superAdmin.email },
+        config.jwtSecret,
+        { expiresIn: '12h' }
+      );
+      return res.json({ token, email: config.superAdmin.email });
+    }
+
+    // Admins créés par le super admin
+    const { rows } = await query<{ id: string; email: string; password_hash: string; active: boolean }>(
+      `SELECT id, email, password_hash, active FROM admins WHERE email = $1`,
+      [mail]
+    );
+    const admin = rows[0];
+    if (!admin || !(await bcrypt.compare(password ?? '', admin.password_hash))) return fail();
+    if (!admin.active) {
+      return res.status(403).json({ error: 'Compte administrateur désactivé' });
     }
     attempts.delete(ip);
-    const token = jwt.sign(
-      { role: 'superadmin', email: config.superAdmin.email },
-      config.jwtSecret,
-      { expiresIn: '12h' }
-    );
-    return res.json({ token, email: config.superAdmin.email });
+    await query(`UPDATE admins SET last_login_at = NOW() WHERE id = $1`, [admin.id]);
+    const token = jwt.sign({ role: 'admin', id: admin.id, email: admin.email }, config.jwtSecret, {
+      expiresIn: '12h',
+    });
+    return res.json({ token, email: admin.email });
   })
 );
 
 router.use(requireSuperAdmin);
 
+/** Section requise selon la route (le super admin a tout). */
+function requiredPermission(method: string, path: string): AdminPermission | 'superadmin' | null {
+  if (path.startsWith('/admins')) return 'superadmin';
+  if (path.startsWith('/garages') || path.startsWith('/users')) return 'garages';
+  if (path.startsWith('/reviews') || path.startsWith('/quotes') || path.startsWith('/appointments'))
+    return 'moderation';
+  if (path.startsWith('/push')) return 'push';
+  if (path.startsWith('/config/logo')) return 'config';
+  // Lecture du catalogue et de la config : utile à toutes les pages
+  if (path.startsWith('/catalog') && method !== 'GET') return 'catalog';
+  return null;
+}
+
+router.use((req: SuperAdminRequest, res, next) => {
+  const need = requiredPermission(req.method, req.path);
+  if (!need || req.admin!.role === 'superadmin') return next();
+  if (need === 'superadmin' || !hasPermission(req.admin, need)) {
+    return res.status(403).json({ error: 'Tu n’as pas accès à cette section.' });
+  }
+  next();
+});
+
 router.get(
   '/me',
-  h(async (req, res) => res.json({ email: req.admin!.email }))
+  h(async (req, res) =>
+    res.json({
+      email: req.admin!.email,
+      name: req.admin!.name,
+      role: req.admin!.role,
+      permissions: req.admin!.permissions,
+    })
+  )
+);
+
+// ─── Comptes admin (super admin uniquement) ─────────────────────────────────
+
+type AdminRow = {
+  id: string;
+  email: string;
+  full_name: string;
+  permissions: string[];
+  active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+};
+
+const mapAdmin = (a: AdminRow) => ({
+  id: a.id,
+  email: a.email,
+  fullName: a.full_name,
+  permissions: a.permissions,
+  active: a.active,
+  lastLoginAt: a.last_login_at,
+  createdAt: a.created_at,
+});
+
+const ADMIN_COLUMNS = 'id, email, full_name, permissions, active, last_login_at, created_at';
+
+function cleanPermissions(v: unknown): AdminPermission[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v)].filter((p): p is AdminPermission =>
+    (ADMIN_PERMISSIONS as readonly string[]).includes(p as string)
+  );
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+router.get(
+  '/admins',
+  h(async (_req, res) => {
+    const { rows } = await query<AdminRow>(`SELECT ${ADMIN_COLUMNS} FROM admins ORDER BY created_at DESC`);
+    return res.json(rows.map(mapAdmin));
+  })
+);
+
+router.post(
+  '/admins',
+  h(async (req, res) => {
+    const b = req.body as { email?: string; fullName?: string; password?: string; permissions?: unknown };
+    const email = (b.email ?? '').toLowerCase().trim();
+    const fullName = (b.fullName ?? '').trim();
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email invalide' });
+    if (!fullName) return res.status(400).json({ error: 'Nom requis' });
+    if ((b.password ?? '').length < 8) {
+      return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum' });
+    }
+    if (email === config.superAdmin.email) {
+      return res.status(409).json({ error: 'Cet email est celui du super admin' });
+    }
+    const hash = await bcrypt.hash(b.password!, 10);
+    try {
+      const { rows } = await query<AdminRow>(
+        `INSERT INTO admins (email, full_name, password_hash, permissions)
+         VALUES ($1, $2, $3, $4) RETURNING ${ADMIN_COLUMNS}`,
+        [email, fullName, hash, cleanPermissions(b.permissions)]
+      );
+      return res.status(201).json(mapAdmin(rows[0]));
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') {
+        return res.status(409).json({ error: 'Un admin utilise déjà cet email' });
+      }
+      throw err;
+    }
+  })
+);
+
+router.put(
+  '/admins/:id',
+  h(async (req, res) => {
+    const b = req.body as {
+      email?: string;
+      fullName?: string;
+      password?: string;
+      permissions?: unknown;
+      active?: boolean;
+    };
+    const sets: string[] = [];
+    const params: unknown[] = [req.params.id];
+    const set = (col: string, v: unknown) => {
+      params.push(v);
+      sets.push(`${col} = $${params.length}`);
+    };
+    if (b.email !== undefined) {
+      const email = b.email.toLowerCase().trim();
+      if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email invalide' });
+      if (email === config.superAdmin.email) {
+        return res.status(409).json({ error: 'Cet email est celui du super admin' });
+      }
+      set('email', email);
+    }
+    if (b.fullName !== undefined) {
+      if (!b.fullName.trim()) return res.status(400).json({ error: 'Nom requis' });
+      set('full_name', b.fullName.trim());
+    }
+    if (b.password) {
+      if (b.password.length < 8) {
+        return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum' });
+      }
+      set('password_hash', await bcrypt.hash(b.password, 10));
+    }
+    if (b.permissions !== undefined) set('permissions', cleanPermissions(b.permissions));
+    if (typeof b.active === 'boolean') set('active', b.active);
+    if (!sets.length) return res.status(400).json({ error: 'Rien à modifier' });
+    try {
+      const { rows } = await query<AdminRow>(
+        `UPDATE admins SET ${sets.join(', ')} WHERE id = $1 RETURNING ${ADMIN_COLUMNS}`,
+        params
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Admin introuvable' });
+      return res.json(mapAdmin(rows[0]));
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') {
+        return res.status(409).json({ error: 'Un admin utilise déjà cet email' });
+      }
+      throw err;
+    }
+  })
+);
+
+router.delete(
+  '/admins/:id',
+  h(async (req, res) => {
+    const { rowCount } = await query(`DELETE FROM admins WHERE id = $1`, [req.params.id]);
+    if (!rowCount) return res.status(404).json({ error: 'Admin introuvable' });
+    return res.status(204).end();
+  })
 );
 
 // ─── Tableau de bord ────────────────────────────────────────────────────────
@@ -144,7 +331,7 @@ router.get(
 /** Tâches à traiter (inscriptions, demandes d'offre, comptes) + avis récents. */
 router.get(
   '/notifications',
-  h(async (_req, res) => {
+  h(async (req, res) => {
     const { rows } = await query<{
       kind: string;
       id: string;
@@ -188,7 +375,10 @@ router.get(
         r.detail = planName(r.detail);
       }
     }
-    return res.json(rows);
+    // Chaque admin ne voit que les notifications de ses sections
+    const canGarages = hasPermission(req.admin, 'garages');
+    const canModeration = hasPermission(req.admin, 'moderation');
+    return res.json(rows.filter((r) => (r.kind === 'review' ? canModeration : canGarages)));
   })
 );
 
@@ -404,7 +594,22 @@ router.get(
 
 router.put(
   '/config',
-  h(async (req, res) => res.json({ config: await saveConfig(req.body) }))
+  h(async (req, res) => {
+    const canPlans = hasPermission(req.admin, 'plans');
+    const canConfig = hasPermission(req.admin, 'config');
+    if (!canPlans && !canConfig) {
+      return res.status(403).json({ error: 'Tu n’as pas accès à cette section.' });
+    }
+    const current = (await getConfig()).config;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    // Offres seules : on ne touche qu'aux offres ; configuration seule : on garde les offres
+    const input = canConfig && canPlans
+      ? body
+      : canPlans
+        ? { ...current, plans: body.plans ?? current.plans }
+        : { ...body, plans: current.plans };
+    return res.json({ config: await saveConfig(input) });
+  })
 );
 
 router.put(

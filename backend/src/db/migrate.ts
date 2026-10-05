@@ -156,6 +156,18 @@ ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_reminded_for TIMESTAMPTZ;
 ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_expired_at TIMESTAMPTZ;
 ALTER TABLE garages ADD COLUMN IF NOT EXISTS plan_expired_from TEXT;
 
+-- Comptes admin du back-office, créés par le super admin (sections autorisées)
+CREATE TABLE IF NOT EXISTS admins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  full_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  permissions TEXT[] NOT NULL DEFAULT '{}',
+  active BOOLEAN NOT NULL DEFAULT true,
+  last_login_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Configuration de l'app (clé 'app' = JSON de config, clé 'logo' = data URL)
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,

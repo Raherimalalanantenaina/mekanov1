@@ -8,15 +8,17 @@ import {
   mdiLogout,
   mdiMenu,
   mdiShapeOutline,
+  mdiShieldAccountOutline,
   mdiShieldCheckOutline,
+  mdiShieldLockOutline,
   mdiViewDashboardOutline,
 } from '@mdi/js';
 import { api, getToken, setToken } from './api';
 import { useI18n, type TKey } from './i18n';
-import type { Category, Stats } from './types';
+import type { AdminPermission, Category, Me, Stats } from './types';
 import { MdiIcon } from './CategoryIcon';
 import { NotificationBell } from './NotificationBell';
-import { Avatar } from './ui';
+import { Avatar, EmptyState } from './ui';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Catalog } from './pages/Catalog';
@@ -26,6 +28,7 @@ import { GarageForm } from './pages/GarageForm';
 import { Moderation } from './pages/Moderation';
 import { Push } from './pages/Push';
 import { Plans } from './pages/Plans';
+import { Admins } from './pages/Admins';
 
 type CatalogValue = {
   catalog: Category[];
@@ -49,7 +52,27 @@ export function useRefreshCounts() {
   return useContext(CountsContext);
 }
 
-type Page = { path: string; label: TKey; icon: string; component: React.ComponentType };
+/** Compte connecté (super admin ou admin) et ses sections autorisées. */
+const MeContext = createContext<Me | null>(null);
+export function useMe() {
+  return useContext(MeContext);
+}
+
+type Page = {
+  path: string;
+  label: TKey;
+  icon: string;
+  component: React.ComponentType;
+  /** Section requise ; 'superadmin' = réservé au super admin */
+  perm?: AdminPermission | 'superadmin';
+};
+
+function canSee(me: Me | null, perm?: Page['perm']) {
+  if (!perm) return true;
+  if (!me) return false;
+  if (me.role === 'superadmin') return true;
+  return perm !== 'superadmin' && me.permissions.includes(perm);
+}
 
 const SECTIONS: { label: TKey; pages: Page[] }[] = [
   {
@@ -59,23 +82,24 @@ const SECTIONS: { label: TKey; pages: Page[] }[] = [
   {
     label: 'navSectionManage',
     pages: [
-      { path: 'garages', label: 'navGarages', icon: mdiGarageVariant, component: Garages },
-      { path: 'moderation', label: 'navModeration', icon: mdiShieldCheckOutline, component: Moderation },
-      { path: 'push', label: 'navPush', icon: mdiBullhornOutline, component: Push },
+      { path: 'garages', label: 'navGarages', icon: mdiGarageVariant, component: Garages, perm: 'garages' },
+      { path: 'moderation', label: 'navModeration', icon: mdiShieldCheckOutline, component: Moderation, perm: 'moderation' },
+      { path: 'push', label: 'navPush', icon: mdiBullhornOutline, component: Push, perm: 'push' },
     ],
   },
   {
     label: 'navSectionCatalog',
     pages: [
-      { path: 'catalog', label: 'navCatalog', icon: mdiShapeOutline, component: Catalog },
-      { path: 'plans', label: 'navPlans', icon: mdiCrownOutline, component: Plans },
+      { path: 'catalog', label: 'navCatalog', icon: mdiShapeOutline, component: Catalog, perm: 'catalog' },
+      { path: 'plans', label: 'navPlans', icon: mdiCrownOutline, component: Plans, perm: 'plans' },
     ],
   },
   {
     label: 'navSectionSettings',
     pages: [
-      { path: 'config', label: 'navConfig', icon: mdiCogOutline, component: Config },
-      { path: 'garage-form', label: 'navGarageForm', icon: mdiFormSelect, component: GarageForm },
+      { path: 'config', label: 'navConfig', icon: mdiCogOutline, component: Config, perm: 'config' },
+      { path: 'garage-form', label: 'navGarageForm', icon: mdiFormSelect, component: GarageForm, perm: 'config' },
+      { path: 'admins', label: 'navAdmins', icon: mdiShieldAccountOutline, component: Admins, perm: 'superadmin' },
     ],
   },
 ];
@@ -97,6 +121,7 @@ export function App() {
   const { t, lang, setLang } = useI18n();
   const [authed, setAuthed] = useState(Boolean(getToken()));
   const [email, setEmail] = useState('');
+  const [me, setMe] = useState<Me | null>(null);
   const [path, setPath] = useState(currentPath);
   const [hashKey, setHashKey] = useState(window.location.hash);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,8 +162,11 @@ export function App() {
 
   useEffect(() => {
     if (!authed) return;
-    api<{ email: string }>('/me')
-      .then((me) => setEmail(me.email))
+    api<Me>('/me')
+      .then((m) => {
+        setMe(m);
+        setEmail(m.email);
+      })
       .catch(() => {});
     reloadCatalog().catch(() => {});
     refreshCounts();
@@ -164,12 +192,19 @@ export function App() {
   const Page = page.component;
   const badge = (p: string) =>
     p === 'garages' ? counts.garages + counts.plans : p === 'plans' ? counts.plans : 0;
+
   const logout = () => {
     setToken(null);
+    setMe(null);
     setAuthed(false);
   };
+  const allowed = canSee(me, page.perm);
+  const sections = SECTIONS.map((s) => ({ ...s, pages: s.pages.filter((p) => canSee(me, p.perm)) })).filter(
+    (s) => s.pages.length > 0
+  );
 
   return (
+    <MeContext.Provider value={me}>
     <CatalogContext.Provider value={{ catalog, setCatalog, reloadCatalog }}>
       <CountsContext.Provider value={refreshCounts}>
         <div className={`layout ${menuOpen ? 'menu-open' : ''}`}>
@@ -188,7 +223,7 @@ export function App() {
               </div>
             </div>
             <nav className="nav">
-              {SECTIONS.map((s) => (
+              {sections.map((s) => (
                 <div key={s.label} className="nav-section">
                   <div className="nav-title">{t(s.label)}</div>
                   {s.pages.map((p) => (
@@ -202,9 +237,9 @@ export function App() {
               ))}
             </nav>
             <div className="sidebar-foot">
-              <Avatar name={email || 'Admin'} size={34} />
+              <Avatar name={me?.name || email || 'Admin'} size={34} />
               <div className="who">
-                <strong>Super admin</strong>
+                <strong>{me?.role === 'admin' ? me.name : t('roleSuperAdmin')}</strong>
                 <span>{email}</span>
               </div>
               <button className="icon-btn" data-tip={t('logout')} aria-label={t('logout')} onClick={logout}>
@@ -234,11 +269,18 @@ export function App() {
               <NotificationBell onChange={refreshCounts} />
             </header>
             <main className="main">
-              <Page key={hashKey} />
+              {!me && page.perm ? null : allowed ? (
+                <Page key={hashKey} />
+              ) : (
+                <div className="card no-access">
+                  <EmptyState text={t('noAccessPage')} icon={mdiShieldLockOutline} />
+                </div>
+              )}
             </main>
           </div>
         </div>
       </CountsContext.Provider>
     </CatalogContext.Provider>
+    </MeContext.Provider>
   );
 }

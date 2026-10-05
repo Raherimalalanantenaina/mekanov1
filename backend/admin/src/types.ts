@@ -189,3 +189,23 @@ export type Appointment = {
   garageId: string;
   garageName: string;
 };
+
+export const ADMIN_PERMISSIONS = ['garages', 'moderation', 'catalog', 'plans', 'push', 'config'] as const;
+export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
+
+export type Me = {
+  email: string;
+  name: string;
+  role: 'superadmin' | 'admin';
+  permissions: AdminPermission[];
+};
+
+export type AdminAccount = {
+  id: string;
+  email: string;
+  fullName: string;
+  permissions: AdminPermission[];
+  active: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+};
