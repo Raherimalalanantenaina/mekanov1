@@ -132,7 +132,7 @@ export const DEFAULT_CONFIG: AppConfig = {
       mobileService: { visible: true, required: false },
     },
   },
-  approval: { accounts: true, garages: true },
+  approval: { accounts: false, garages: false },
   support: { phone: '', email: '' },
   plans: DEFAULT_PLANS,
 };

@@ -24,6 +24,8 @@ import {
 import { pushBroadcast, pushToUser } from '../push';
 import { approveOwnerOf, GarageRow, mapGarage, RATING_SELECT } from './garages';
 import { effectivePlanSql, isPlanId } from '../plans';
+import { enabledProviders, getProvider, publicPayment, refreshPayment } from '../payments/service';
+import type { PaymentRow } from '../payments/types';
 
 const router = Router();
 
@@ -107,6 +109,7 @@ function requiredPermission(method: string, path: string): AdminPermission | 'su
   if (path.startsWith('/reviews') || path.startsWith('/quotes') || path.startsWith('/appointments'))
     return 'moderation';
   if (path.startsWith('/push')) return 'push';
+  if (path.startsWith('/payments')) return 'plans';
   if (path.startsWith('/config/logo')) return 'config';
   // Lecture du catalogue et de la config : utile à toutes les pages
   if (path.startsWith('/catalog') && method !== 'GET') return 'catalog';
@@ -754,6 +757,63 @@ router.get(
       ownerEmail: rows[0].owner_email,
       ownerName: rows[0].owner_name,
     });
+  })
+);
+
+/** Paiements mobile money des offres (filtres : statut, opérateur, recherche). */
+router.get(
+  '/payments',
+  h(async (req, res) => {
+    const params: unknown[] = [];
+    const where: string[] = [];
+    const status = String(req.query.status || '');
+    const provider = String(req.query.provider || '');
+    const q = String(req.query.q || '').trim();
+    if (['pending', 'success', 'failed', 'expired'].includes(status)) {
+      params.push(status);
+      where.push(`p.status = $${params.length}`);
+    }
+    if (getProvider(provider)) {
+      params.push(provider);
+      where.push(`p.provider = $${params.length}`);
+    }
+    if (q) {
+      params.push(`%${q}%`);
+      where.push(
+        `(g.name ILIKE $${params.length} OR p.reference ILIKE $${params.length} OR p.msisdn ILIKE $${params.length} OR p.provider_txn_id ILIKE $${params.length})`
+      );
+    }
+    const { rows } = await query<PaymentRow & { garage_name: string }>(
+      `SELECT p.*, g.name AS garage_name FROM payments p JOIN garages g ON g.id = p.garage_id
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        ORDER BY p.created_at DESC LIMIT 200`,
+      params
+    );
+    const totals = await query<{ total: string; month: string; count: string }>(
+      `SELECT COALESCE(SUM(amount), 0) AS total,
+              COALESCE(SUM(amount) FILTER (WHERE completed_at >= date_trunc('month', NOW())), 0) AS month,
+              COUNT(*) AS count
+         FROM payments WHERE status = 'success'`
+    );
+    res.json({
+      providers: enabledProviders(),
+      totals: {
+        total: Number(totals.rows[0].total),
+        month: Number(totals.rows[0].month),
+        count: Number(totals.rows[0].count),
+      },
+      payments: rows.map((r) => ({ ...publicPayment(r), garageName: r.garage_name })),
+    });
+  })
+);
+
+/** Revérifie un paiement auprès de l'opérateur (y compris un paiement expiré). */
+router.post(
+  '/payments/:id/refresh',
+  h(async (req, res) => {
+    const p = await refreshPayment(req.params.id, { includeExpired: true });
+    if (!p) return res.status(404).json({ error: 'Paiement introuvable' });
+    res.json(publicPayment(p));
   })
 );
 

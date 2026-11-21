@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   mdiBullhornOutline,
+  mdiCashMultiple,
   mdiCogOutline,
   mdiCrownOutline,
   mdiFormSelect,
@@ -28,6 +29,7 @@ import { GarageForm } from './pages/GarageForm';
 import { Moderation } from './pages/Moderation';
 import { Push } from './pages/Push';
 import { Plans } from './pages/Plans';
+import { Payments } from './pages/Payments';
 import { Admins } from './pages/Admins';
 
 type CatalogValue = {
@@ -92,6 +94,7 @@ const SECTIONS: { label: TKey; pages: Page[] }[] = [
     pages: [
       { path: 'catalog', label: 'navCatalog', icon: mdiShapeOutline, component: Catalog, perm: 'catalog' },
       { path: 'plans', label: 'navPlans', icon: mdiCrownOutline, component: Plans, perm: 'plans' },
+      { path: 'payments', label: 'navPayments', icon: mdiCashMultiple, component: Payments, perm: 'plans' },
     ],
   },
   {

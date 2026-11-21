@@ -182,6 +182,33 @@ FROM quote_requests q
 WHERE NOT EXISTS (
   SELECT 1 FROM quote_messages m WHERE m.request_id = q.id
 );
+
+-- Paiements mobile money (MVola / Orange Money / Airtel Money) des offres
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reference TEXT NOT NULL UNIQUE,
+  garage_id UUID NOT NULL REFERENCES garages(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan TEXT NOT NULL,
+  months INT NOT NULL DEFAULT 1,
+  amount INT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'MGA',
+  provider TEXT NOT NULL CHECK (provider IN ('mvola', 'orange', 'airtel', 'simulation')),
+  msisdn TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'success', 'failed', 'expired')),
+  provider_ref TEXT,
+  provider_txn_id TEXT,
+  payment_url TEXT,
+  notif_token TEXT,
+  error TEXT,
+  raw JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_payments_garage ON payments (garage_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_pending ON payments (status) WHERE status = 'pending';
 `;
 
 async function migrate() {

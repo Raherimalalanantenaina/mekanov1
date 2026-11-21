@@ -61,7 +61,7 @@ export function Garages() {
   const [status, setStatus] = useState(initial.get('status') ?? '');
   const [category, setCategory] = useState('');
   const [plan, setPlan] = useState(initial.get('plan') ?? '');
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(initial.get('q') ?? '');
   const [editing, setEditing] = useState<{ id: string | null; ownerId?: string } | null>(null);
   const { config } = useAppConfig();
   const planName = (id: PlanId) =>

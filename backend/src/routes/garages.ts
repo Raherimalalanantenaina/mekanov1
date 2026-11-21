@@ -1,13 +1,10 @@
 import { Router } from 'express';
-import crypto from 'crypto';
 import { query } from '../db/pool';
-import { config } from '../config';
-import { sendAdminNotice, sendAdminValidationEmail } from '../mailer';
+import { sendAdminNotice } from '../mailer';
 import { boostedPlans, effectivePlanSql, effectivePlan, garageFeatures, isPlanId, withPlan } from '../plans';
 import { AuthedRequest, requireGarageAuth } from '../middleware/auth';
 import { getConfig } from '../appSettings';
 import {
-  categoryLabel,
   matchingCategoryIds,
   resolveCategories,
   servicesForCategory,
@@ -124,8 +121,9 @@ router.get('/', async (req, res) => {
   const service = String(req.query.service || '').trim();
   const lat = req.query.lat != null ? Number(req.query.lat) : null;
   const lng = req.query.lng != null ? Number(req.query.lng) : null;
+  // Rayon uniquement si demandé (carte). Sinon toute l'île, triée par distance.
   const radiusKm =
-    req.query.radiusKm != null ? Number(req.query.radiusKm) : 50;
+    req.query.radiusKm != null ? Number(req.query.radiusKm) : null;
 
   const params: unknown[] = [];
   const where: string[] = [
@@ -170,15 +168,17 @@ router.get('/', async (req, res) => {
         cos(radians(longitude) - radians($${lngIdx})) +
         sin(radians($${latIdx})) * sin(radians(latitude))
       )) AS distance_km`;
-    params.push(radiusKm);
-    where.push(`
-      (6371 * acos(
-        cos(radians($${latIdx})) * cos(radians(latitude)) *
-        cos(radians(longitude) - radians($${lngIdx})) +
-        sin(radians($${latIdx})) * sin(radians(latitude))
-      )) <= $${params.length}
-    `);
     orderBy = 'distance_km ASC';
+    if (radiusKm != null && Number.isFinite(radiusKm) && radiusKm > 0) {
+      params.push(radiusKm);
+      where.push(`
+        (6371 * acos(
+          cos(radians($${latIdx})) * cos(radians(latitude)) *
+          cos(radians(longitude) - radians($${lngIdx})) +
+          sin(radians($${latIdx})) * sin(radians(latitude))
+        )) <= $${params.length}
+      `);
+    }
   }
 
   // Meilleure visibilité : les offres « boost » passent en tête
@@ -190,7 +190,7 @@ router.get('/', async (req, res) => {
     FROM garages
     WHERE ${where.join(' AND ')}
     ORDER BY (${effectivePlanSql()} = ANY($${boostIdx}::text[])) DESC, ${orderBy}
-    LIMIT 200
+    LIMIT 500
   `;
 
   const { rows } = await query<GarageRow>(sql, params);
@@ -448,8 +448,6 @@ export async function createGarageForOwner(ownerId: string, b: Record<string, an
   if (!owner.rows[0] || owner.rows[0].status === 'suspended') {
     return { status: 403, body: { error: 'Compte suspendu par l’administrateur' } };
   }
-  const ownerPending = owner.rows[0].status === 'pending';
-
   const existing = await query<{ count: string }>(
     `SELECT COUNT(*) AS count FROM garages WHERE owner_id = $1`,
     [ownerId]
@@ -461,13 +459,8 @@ export async function createGarageForOwner(ownerId: string, b: Record<string, an
     };
   }
 
-  const { config: appConfig } = await getConfig();
   const categories = resolveCategories(rawCategories, rawServices);
   const services = servicesForCategory(categories, rawServices);
-
-  // Compte en attente : la validation du garage validera aussi le compte
-  const needsApproval = appConfig.approval.garages || ownerPending;
-  const approvalToken = needsApproval ? crypto.randomUUID() : null;
 
   const { rows } = await query<GarageRow>(
     `INSERT INTO garages
@@ -493,30 +486,14 @@ export async function createGarageForOwner(ownerId: string, b: Record<string, an
       openingHours,
       hoursJson ? JSON.stringify(hoursJson) : null,
       isOpen,
-      needsApproval ? 'pending' : 'approved',
-      approvalToken,
+      'approved',
+      null,
       categories,
     ]
   );
 
-  if (approvalToken) {
-    await sendAdminValidationEmail({
-      subject: ownerPending ? 'Nouveau garagiste à valider' : 'Nouveau garage à valider',
-      intro: ownerPending
-        ? 'Un nouveau garagiste vient de s’inscrire avec son garage. Valider le garage valide aussi son compte.'
-        : 'Un nouveau garage vient d’être publié sur Mekano et attend ta validation avant d’être visible par les clients.',
-      details: {
-        Garage: name,
-        Adresse: `${address}${city ? `, ${city}` : ''}`,
-        'Téléphone': phone || '—',
-        'Type de service': categories.map(categoryLabel).join(', ') || '—',
-        'Sous-types': services.join(', ') || '—',
-        'Propriétaire': `${owner.rows[0].full_name} (${owner.rows[0].email})`,
-      },
-      approveUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/approve`,
-      rejectUrl: `${config.publicUrl}/api/admin/garages/${approvalToken}/reject`,
-    });
-  }
+  // Un garage publié active aussi le compte, pour qu’il soit visible tout de suite
+  await approveOwnerOf(rows[0].id);
 
   return { status: 201, body: await withPlan(mapGarage(rows[0]), { public: false }) };
 }

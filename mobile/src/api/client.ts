@@ -8,6 +8,8 @@ import type {
   DailyStat,
   Garage,
   GaragesResponse,
+  Payment,
+  PaymentProviderInfo,
   PlanId,
   Quote,
   QuoteMessage,
@@ -362,6 +364,29 @@ export async function requestPlan(id: string, plan: PlanId): Promise<Garage> {
 
 export async function cancelPlanRequest(id: string): Promise<Garage> {
   return api<Garage>(`/api/garages/${id}/plan-request`, { method: 'DELETE' }, true);
+}
+
+/** Opérateurs mobile money disponibles (MVola, Orange Money, Airtel Money). */
+export async function fetchPaymentProviders(): Promise<PaymentProviderInfo[]> {
+  return api<PaymentProviderInfo[]>('/api/payments/providers');
+}
+
+/** Lance le paiement d'une offre ; l'offre s'active dès la confirmation de l'opérateur. */
+export async function startPlanPayment(opts: {
+  garageId: string;
+  plan: PlanId;
+  provider: string;
+  msisdn: string;
+}): Promise<Payment> {
+  return api<Payment>('/api/payments', { method: 'POST', body: JSON.stringify(opts) }, true);
+}
+
+export async function fetchPayment(id: string): Promise<Payment> {
+  return api<Payment>(`/api/payments/${id}`, {}, true);
+}
+
+export async function fetchGaragePayments(garageId: string): Promise<Payment[]> {
+  return api<Payment[]>(`/api/payments/garage/${garageId}`, {}, true);
 }
 
 export async function deleteGarage(id: string): Promise<void> {

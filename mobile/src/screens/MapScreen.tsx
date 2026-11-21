@@ -33,7 +33,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n } from '../i18n';
 import { garageMatches } from '../serviceCatalog';
-import { mapStyleFor, circlePolygon, zoomForDelta } from '../map/osm';
+import { mapStyleFor, boundsOf, circlePolygon, zoomForDelta } from '../map/osm';
 import { font, radii, shadow, type ThemeColors } from '../theme';
 import { garageFeatures } from '../appConfig';
 import type { Garage } from '../types';
@@ -96,15 +96,21 @@ export function MapScreen() {
             lat = pos.coords.latitude;
             lng = pos.coords.longitude;
             setUserPos({ latitude: lat, longitude: lng });
-            cameraRef.current?.easeTo({
-              center: [lng, lat],
-              zoom: zoomForDelta(0.08),
-              duration: 800,
-            });
           }
           const data = await fetchGarages({ lat, lng });
           setGarages(data.garages);
           setIsOfflineData(data.offline);
+          const pts = data.garages.map((g) => ({
+            latitude: g.latitude,
+            longitude: g.longitude,
+          }));
+          if (lat != null && lng != null) pts.push({ latitude: lat, longitude: lng });
+          if (pts.length > 0) {
+            cameraRef.current?.fitBounds(boundsOf(pts), {
+              padding: { top: 120, bottom: 160, left: 40, right: 40 },
+              duration: 800,
+            });
+          }
         } finally {
           setLoading(false);
         }
@@ -158,6 +164,15 @@ export function MapScreen() {
       cameraRef.current?.easeTo({
         center: [userPos.longitude, userPos.latitude],
         zoom: zoomForDelta(delta),
+        duration: 600,
+      });
+      return;
+    }
+    const pts = garages.map((g) => ({ latitude: g.latitude, longitude: g.longitude }));
+    if (userPos) pts.push(userPos);
+    if (pts.length > 0) {
+      cameraRef.current?.fitBounds(boundsOf(pts), {
+        padding: { top: 120, bottom: 160, left: 40, right: 40 },
         duration: 600,
       });
     }

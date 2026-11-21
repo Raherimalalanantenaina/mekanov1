@@ -126,3 +126,33 @@ export type GaragesResponse = {
   offline: boolean;
   garages: Garage[];
 };
+
+export type PaymentProviderId = 'mvola' | 'orange' | 'airtel' | 'simulation';
+
+/** Opérateur mobile money proposé par le serveur. */
+export type PaymentProviderInfo = {
+  id: PaymentProviderId;
+  label: string;
+  /** Préfixes acceptés sans le 0 (ex. 34, 38) */
+  prefixes: string[];
+  /** true : paiement sur une page web (Orange Money) plutôt qu'un push USSD */
+  redirect: boolean;
+};
+
+export type Payment = {
+  id: string;
+  reference: string;
+  garageId: string;
+  plan: PlanId;
+  months: number;
+  amount: number;
+  currency: string;
+  provider: PaymentProviderId;
+  msisdn: string;
+  status: 'pending' | 'success' | 'failed' | 'expired';
+  paymentUrl: string | null;
+  providerTxnId: string | null;
+  error: string | null;
+  createdAt: string;
+  completedAt: string | null;
+};

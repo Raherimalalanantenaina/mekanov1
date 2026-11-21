@@ -13,9 +13,11 @@ import pushRoutes from './routes/push';
 import configRoutes from './routes/config';
 import superAdminRoutes from './routes/superadmin';
 import syncRoutes from './routes/sync';
+import paymentRoutes from './routes/payments';
 import { loadCatalog } from './serviceCatalog';
 import { attachRealtime, realtimeMiddleware } from './realtime';
 import { startPlanJobs } from './planJobs';
+import { startPaymentJobs } from './payments/service';
 
 const app = express();
 
@@ -25,6 +27,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'mekano-api', mode: 'online' });
@@ -39,6 +42,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 
 // Site web super admin (build Vite de backend/admin)
@@ -73,4 +77,5 @@ loadCatalog()
     });
     attachRealtime(server);
     startPlanJobs();
+    startPaymentJobs();
   });

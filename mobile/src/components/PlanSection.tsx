@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { cancelPlanRequest, requestPlan } from '../api/client';
+import { cancelPlanRequest, fetchPaymentProviders, requestPlan } from '../api/client';
 import { PLAN_FEATURES, PLAN_IDS, planName, useAppConfig } from '../appConfig';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n, type TKey } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
-import type { Garage, PlanId } from '../types';
+import type { Garage, PaymentProviderInfo, PlanId } from '../types';
 import { BouncyPressable } from './Pressable';
 import { notify } from './Notifier';
+import { PaymentSheet } from './PaymentSheet';
 
-/** « Mon offre » : offre en cours et demande de changement (activée par le super admin). */
+/**
+ * « Mon offre » : offre en cours et paiement mobile money (MVola, Orange Money,
+ * Airtel Money) qui active l'offre aussitôt. Sans opérateur configuré, on garde
+ * la demande manuelle activée par le super admin.
+ */
 export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: () => void }) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { t, lang } = useI18n();
   const { config } = useAppConfig();
   const [busy, setBusy] = useState(false);
+  const [providers, setProviders] = useState<PaymentProviderInfo[]>([]);
+  const [paying, setPaying] = useState<PlanId | null>(null);
+
+  useEffect(() => {
+    fetchPaymentProviders()
+      .then(setProviders)
+      .catch(() => setProviders([]));
+  }, []);
+  const canPay = providers.length > 0;
+  const onPaid = useCallback(() => onChanged(), [onChanged]);
 
   const current: PlanId = garage.plan ?? 'free';
   const daysLeft = garage.planExpiresAt
@@ -26,6 +41,8 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
     config.plans[id].price > 0
       ? `${config.plans[id].price.toLocaleString('fr-FR')} ${t('perMonth')}`
       : t('planFree');
+
+  const onChoose = (id: PlanId) => (canPay ? setPaying(id) : onRequest(id));
 
   const onRequest = (id: PlanId) => {
     notify.alert(
@@ -131,7 +148,7 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
             ))}
             {isCurrent && id !== 'free' && !isRequested && daysLeft != null && daysLeft <= 7 ? (
               <BouncyPressable
-                onPress={() => onRequest(id)}
+                onPress={() => onChoose(id)}
                 disabled={busy}
                 style={[styles.btn, busy && { opacity: 0.6 }]}
               >
@@ -141,22 +158,34 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
               <View style={[styles.btn, styles.btnCurrent]}>
                 <Text style={[styles.btnText, { color: colors.teal }]}>{t('currentPlan')}</Text>
               </View>
-            ) : isRequested ? (
+            ) : isRequested && !canPay ? (
               <View style={[styles.btn, styles.btnCurrent]}>
                 <Text style={[styles.btnText, { color: colors.amberDark }]}>{t('planRequested')}</Text>
               </View>
             ) : id !== 'free' ? (
               <BouncyPressable
-                onPress={() => onRequest(id)}
+                onPress={() => onChoose(id)}
                 disabled={busy}
                 style={[styles.btn, busy && { opacity: 0.6 }]}
               >
-                <Text style={styles.btnText}>{t('planRequest')}</Text>
+                <Text style={styles.btnText}>{canPay ? t('payBtn') : t('planRequest')}</Text>
               </BouncyPressable>
             ) : null}
           </View>
         );
       })}
+
+      <PaymentSheet
+        garage={garage}
+        plan={paying}
+        providers={providers}
+        onClose={() => setPaying(null)}
+        onPaid={onPaid}
+        onOther={(id) => {
+          setPaying(null);
+          onRequest(id);
+        }}
+      />
     </View>
   );
 }

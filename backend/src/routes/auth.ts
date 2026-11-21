@@ -42,7 +42,8 @@ router.post('/register', async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   const { approval } = (await getConfig()).config;
-  const needsApproval = garage ? approval.accounts || approval.garages : approval.accounts;
+  // Inscription avec garage : publié tout de suite, sans validation admin
+  const needsApproval = garage ? false : approval.accounts;
   // Avec un garage, c'est l'email de validation du garage qui valide aussi le compte
   const approvalToken = needsApproval && !garage ? crypto.randomUUID() : null;
 

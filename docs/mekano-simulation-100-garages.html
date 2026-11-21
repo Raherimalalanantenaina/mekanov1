@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mekano — Simulation 100 garages</title>
+  <style>
+    @page { size: A4; margin: 14mm 13mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: #101617;
+      background: #fff;
+      font-size: 10.2pt;
+      line-height: 1.42;
+    }
+    h1, h2, h3 { color: #12717A; margin: 0 0 8px; }
+    h1 { font-size: 24pt; letter-spacing: 0.02em; }
+    h2 {
+      font-size: 14pt;
+      border-bottom: 2px solid #12717A;
+      padding-bottom: 5px;
+      margin-bottom: 12px;
+    }
+    h3 { font-size: 11pt; color: #0B5A62; margin: 12px 0 6px; }
+    p { margin: 0 0 7px; }
+    .muted { color: #5F6B6C; }
+    .tiny { font-size: 8pt; color: #9AA6A7; }
+    .page { page-break-after: always; padding: 2px 0 6px; }
+    .page:last-child { page-break-after: auto; }
+
+    .cover {
+      min-height: 255mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background: radial-gradient(ellipse at 50% 18%, #EAF3F3 0%, #fff 58%);
+    }
+    .cover img { width: 168px; height: auto; margin-bottom: 16px; }
+    .tag {
+      display: inline-block;
+      background: #12717A;
+      color: #fff;
+      font-size: 9.5pt;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin: 10px 0 14px;
+    }
+    .tag.amber { background: #F0A72C; color: #101617; }
+    .cover .subtitle { font-size: 12.5pt; color: #5F6B6C; max-width: 460px; }
+    .cover .hero-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      width: 100%;
+      max-width: 520px;
+      margin-top: 28px;
+    }
+    .cover .hero-kpis .kpi { text-align: center; padding: 12px 8px; }
+    .cover .meta { margin-top: 36px; font-size: 9pt; color: #9AA6A7; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    .card {
+      border: 1px solid #ECEFEF;
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: #fff;
+    }
+    .card h3 { margin-top: 0; }
+    .kpi {
+      border: 1px solid #ECEFEF;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #F7FBFA;
+    }
+    .kpi .value {
+      font-size: 16pt;
+      font-weight: 800;
+      color: #12717A;
+      line-height: 1.15;
+    }
+    .kpi .label { font-size: 8pt; color: #5F6B6C; margin-top: 2px; }
+    .kpi.amber { background: #FBF6EA; }
+    .kpi.amber .value { color: #C77F0F; }
+    .kpi.dark { background: #12717A; color: #fff; }
+    .kpi.dark .value { color: #fff; }
+    .kpi.dark .label { color: #CDE6E1; }
+    .kpi.ok { background: #EAF6EE; }
+    .kpi.ok .value { color: #1B7A46; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 8px 0 10px; }
+    th, td { border: 1px solid #ECEFEF; padding: 6px 8px; text-align: left; }
+    th { background: #EAF3F3; color: #0B5A62; font-weight: 700; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.total td { background: #EAF3F3; font-weight: 800; color: #0B5A62; }
+    tr.neg td { color: #B42318; }
+    tr.pos td { color: #1B7A46; }
+    .plan-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 6px; vertical-align: middle;
+    }
+
+    .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 8.5pt; }
+    .bar-row .name { width: 78px; color: #5F6B6C; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 11px; background: #EAF3F3; border-radius: 6px; overflow: hidden; }
+    .bar-track span { display: block; height: 100%; border-radius: 6px; }
+    .bar-row .n { width: 92px; text-align: right; font-weight: 700; color: #0B5A62; flex-shrink: 0; }
+
+    ul.feat { padding-left: 18px; margin: 4px 0 8px; }
+    ul.feat li { margin-bottom: 4px; }
+    .badge {
+      display: inline-block; background: #FBF1DD; color: #C77F0F;
+      font-size: 8pt; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    }
+    .badge.teal { background: #EAF3F3; color: #12717A; }
+    .note {
+      background: #F7FBFA;
+      border-left: 3px solid #12717A;
+      padding: 8px 10px;
+      border-radius: 0 8px 8px 0;
+      font-size: 9pt;
+      color: #5F6B6C;
+    }
+    .footer-note { margin-top: 10px; font-size: 8pt; color: #9AA6A7; text-align: center; }
+    .hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .hdr img { height: 28px; }
+    .hdr .doc { font-size: 8pt; color: #9AA6A7; font-weight: 700; letter-spacing: 0.04em; }
+    .callout {
+      background: #12717A; color: #fff; border-radius: 12px; padding: 12px 14px;
+      margin: 10px 0;
+    }
+    .callout strong { color: #F0A72C; }
+    .small-table td, .small-table th { padding: 5px 7px; font-size: 8.5pt; }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE 1 — Couverture -->
+  <section class="page cover">
+    <img src="mekano-logo-doc.png" alt="Logo Mekano" />
+    <div class="tag">Simulation financière</div>
+    <h1>100 garages</h1>
+    <p class="subtitle">
+      Ce que 100 garages dépensent sur Mekano, ce que ça rapporte,
+      et ce que ça coûte d’exploiter l’app à Madagascar.
+    </p>
+    <div class="hero-kpis">
+      <div class="kpi">
+        <div class="value">825 000</div>
+        <div class="label">Ar / mois (scénario réaliste)</div>
+      </div>
+      <div class="kpi amber">
+        <div class="value">9,9 M</div>
+        <div class="label">Ar / an une fois à 100 garages</div>
+      </div>
+      <div class="kpi ok">
+        <div class="value">+355 k</div>
+        <div class="label">Ar / mois de résultat net</div>
+      </div>
+    </div>
+    <p class="meta">
+      Mekano · Offres officielles de l’app · Octobre 2026<br />
+      Document de simulation — pas un bilan réel
+    </p>
+  </section>
+
+  <!-- PAGE 2 — Offres & mix -->
+  <section class="page">
+    <div class="hdr">
+      <img src="mekano-logo-doc.png" alt="" />
+      <div class="doc">SIMULATION · 100 GARAGES · P.2</div>
+    </div>
+    <h2>1. Les 4 offres Mekano</h2>
+    <p class="muted">Prix mensuels actuellement dans l’app. Paiement hors app (MVola, Orange Money, espèces).</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Offre</th>
+          <th class="num">Prix / mois</th>
+          <th>Ce que le garage obtient</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="plan-dot" style="background:#9AA6A7;"></span>Gratuite</td>
+          <td class="num">0 Ar</td>
+          <td>Fiche visible + téléphone</td>
+        </tr>
+        <tr>
+          <td><span class="plan-dot" style="background:#0369a1;"></span>Basique</td>
+          <td class="num">5 000 Ar</td>
+          <td>Téléphone + itinéraire GPS</td>
+        </tr>
+        <tr>
+          <td><span class="plan-dot" style="background:#12717A;"></span>Standard</td>
+          <td class="num">15 000 Ar</td>
+          <td>Photos, horaires, tarifs, promo, déplacement</td>
+        </tr>
+        <tr>
+          <td><span class="plan-dot" style="background:#F0A72C;"></span>Premium</td>
+          <td class="num">30 000 Ar</td>
+          <td>Tout + devis, RDV, WhatsApp, avis, mise en avant</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Mix d’abonnements pour 100 garages</h3>
+    <p class="muted">Trois hypothèses d’adoption. Le scénario <strong>réaliste</strong> est la base du reste du document.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Offre</th>
+          <th class="num">Pessimiste</th>
+          <th class="num">Réaliste</th>
+          <th class="num">Optimiste</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Gratuite</td>
+          <td class="num">50</td>
+          <td class="num">35</td>
+          <td class="num">20</td>
+        </tr>
+        <tr>
+          <td>Basique</td>
+          <td class="num">30</td>
+          <td class="num">30</td>
+          <td class="num">25</td>
+        </tr>
+        <tr>
+          <td>Standard</td>
+          <td class="num">15</td>
+          <td class="num">25</td>
+          <td class="num">30</td>
+        </tr>
+        <tr>
+          <td>Premium</td>
+          <td class="num">5</td>
+          <td class="num">10</td>
+          <td class="num">25</td>
+        </tr>
+        <tr class="total">
+          <td>Garages payants</td>
+          <td class="num">50</td>
+          <td class="num">65</td>
+          <td class="num">80</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="grid-3">
+      <div class="kpi">
+        <div class="label">Pessimiste · 50 % payants</div>
+        <div class="value">525 000 Ar</div>
+        <div class="label">/ mois · 6,3 M Ar / an</div>
+      </div>
+      <div class="kpi dark">
+        <div class="label">Réaliste · 65 % payants</div>
+        <div class="value">825 000 Ar</div>
+        <div class="label">/ mois · 9,9 M Ar / an</div>
+      </div>
+      <div class="kpi amber">
+        <div class="label">Optimiste · 80 % payants</div>
+        <div class="value">1 325 000 Ar</div>
+        <div class="label">/ mois · 15,9 M Ar / an</div>
+      </div>
+    </div>
+    <p class="tiny">ARPU réaliste : 8 250 Ar / garage / mois. ARPU des payants : 12 692 Ar.</p>
+  </section>
+
+  <!-- PAGE 3 — Recettes détaillées -->
+  <section class="page">
+    <div class="hdr">
+      <img src="mekano-logo-doc.png" alt="" />
+      <div class="doc">SIMULATION · 100 GARAGES · P.3</div>
+    </div>
+    <h2>2. Ce que les 100 garages dépensent</h2>
+    <p class="muted">Scénario réaliste — détail du chiffre d’affaires Mekano (ce que les garages paient).</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Offre</th>
+          <th class="num">Garages</th>
+          <th class="num">Prix unitaire</th>
+          <th class="num">Dépense / mois</th>
+          <th class="num">Dépense / an</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="plan-dot" style="background:#9AA6A7;"></span>Gratuite</td>
+          <td class="num">35</td>
+          <td class="num">0 Ar</td>
+          <td class="num">0 Ar</td>
+          <td class="num">0 Ar</td>
+        </tr>
+        <tr>
+          <td><span class="plan-dot" style="background:#0369a1;"></span>Basique</td>
+          <td class="num">30</td>
+          <td class="num">5 000 Ar</td>
+          <td class="num">150 000 Ar</td>
+          <td class="num">1 800 000 Ar</td>
+        </tr>
+        <tr>
+          <td><span class="plan-dot" style="background:#12717A;"></span>Standard</td>
+          <td class="num">25</td>
+          <td class="num">15 000 Ar</td>
+          <td class="num">375 000 Ar</td>
+          <td class="num">4 500 000 Ar</td>
+        </tr>
+        <tr>
+          <td><span class="plan-dot" style="background:#F0A72C;"></span>Premium</td>
+          <td class="num">10</td>
+          <td class="num">30 000 Ar</td>
+          <td class="num">300 000 Ar</td>
+          <td class="num">3 600 000 Ar</td>
+        </tr>
+        <tr class="total">
+          <td>Total 100 garages</td>
+          <td class="num">100</td>
+          <td class="num">—</td>
+          <td class="num">825 000 Ar</td>
+          <td class="num">9 900 000 Ar</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Répartition de la recette mensuelle</h3>
+    <div class="bar-row">
+      <div class="name">Basique</div>
+      <div class="bar-track"><span style="width:18.2%;background:#0369a1;"></span></div>
+      <div class="n">150 k · 18 %</div>
+    </div>
+    <div class="bar-row">
+      <div class="name">Standard</div>
+      <div class="bar-track"><span style="width:45.5%;background:#12717A;"></span></div>
+      <div class="n">375 k · 45 %</div>
+    </div>
+    <div class="bar-row">
+      <div class="name">Premium</div>
+      <div class="bar-track"><span style="width:36.4%;background:#F0A72C;"></span></div>
+      <div class="n">300 k · 36 %</div>
+    </div>
+
+    <div class="grid-2" style="margin-top:14px;">
+      <div class="card">
+        <h3>Où sont les 100 garages ?</h3>
+        <p class="tiny" style="margin-bottom:6px;">Répartition commerciale type, pas un recensement.</p>
+        <table class="small-table">
+          <tbody>
+            <tr><td>Antananarivo</td><td class="num">45</td></tr>
+            <tr><td>Toamasina</td><td class="num">12</td></tr>
+            <tr><td>Fianarantsoa</td><td class="num">10</td></tr>
+            <tr><td>Antsirabe</td><td class="num">8</td></tr>
+            <tr><td>Mahajanga</td><td class="num">8</td></tr>
+            <tr><td>Toliara</td><td class="num">6</td></tr>
+            <tr><td>Antsiranana</td><td class="num">5</td></tr>
+            <tr><td>Autres villes</td><td class="num">6</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Lecture rapide</h3>
+        <ul class="feat">
+          <li>Les 35 gratuits remplissent la carte (clients) sans rien payer.</li>
+          <li>Les 25 Standard portent presque la moitié de la recette.</li>
+          <li>10 Premium suffisent à 36 % du CA grâce au prix × 2.</li>
+          <li>Objectif commercial : faire monter Basique → Standard, pas forcer le Premium tout de suite.</li>
+        </ul>
+        <div class="note">
+          1 compte = 1 garage. Un garage qui n’est pas validé n’apparaît pas
+          et ne paie pas.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 4 — Dépenses Mekano -->
+  <section class="page">
+    <div class="hdr">
+      <img src="mekano-logo-doc.png" alt="" />
+      <div class="doc">SIMULATION · 100 GARAGES · P.4</div>
+    </div>
+    <h2>3. Dépenses Mekano à 100 garages</h2>
+    <p class="muted">Budget d’exploitation mensuel, structure légère (fondateur + app déjà en place). Madagascar, 2026.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Poste</th>
+          <th>Détail</th>
+          <th class="num">Ar / mois</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Hébergement</td>
+          <td>VPS, PostgreSQL, sauvegardes</td>
+          <td class="num">60 000</td>
+        </tr>
+        <tr>
+          <td>Stockage photos</td>
+          <td>Fiches garage, ~12 photos max</td>
+          <td class="num">20 000</td>
+        </tr>
+        <tr>
+          <td>Nom de domaine &amp; stores</td>
+          <td>Domaine, SSL, Play Store (amorti)</td>
+          <td class="num">10 000</td>
+        </tr>
+        <tr>
+          <td>Emails</td>
+          <td>Validation comptes / garages, SMTP</td>
+          <td class="num">10 000</td>
+        </tr>
+        <tr>
+          <td>Internet &amp; téléphone</td>
+          <td>Support, MVola / Orange Money</td>
+          <td class="num">50 000</td>
+        </tr>
+        <tr>
+          <td>Publicité</td>
+          <td>Facebook / TikTok, ciblage garages &amp; clients</td>
+          <td class="num">180 000</td>
+        </tr>
+        <tr>
+          <td>Terrain</td>
+          <td>Visites garages, carburant, déplacements</td>
+          <td class="num">80 000</td>
+        </tr>
+        <tr>
+          <td>Frais Mobile Money</td>
+          <td>≈ 2 % des encaissements (825 000)</td>
+          <td class="num">16 500</td>
+        </tr>
+        <tr>
+          <td>Imprévus</td>
+          <td>Réparations, extras, marge de sécurité</td>
+          <td class="num">43 500</td>
+        </tr>
+        <tr class="total">
+          <td colspan="2">Total charges d’exploitation</td>
+          <td class="num">470 000 Ar</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="grid-3">
+      <div class="kpi">
+        <div class="label">Recettes</div>
+        <div class="value">825 000 Ar</div>
+        <div class="label">abonnements / mois</div>
+      </div>
+      <div class="kpi amber">
+        <div class="label">Charges</div>
+        <div class="value">470 000 Ar</div>
+        <div class="label">exploitation / mois</div>
+      </div>
+      <div class="kpi ok">
+        <div class="label">Résultat net</div>
+        <div class="value">+355 000 Ar</div>
+        <div class="label">marge 43 % · 4,26 M Ar / an</div>
+      </div>
+    </div>
+
+    <h3>Les 3 scénarios, résultat mensuel</h3>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th class="num">Pessimiste</th>
+          <th class="num">Réaliste</th>
+          <th class="num">Optimiste</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Recettes</td>
+          <td class="num">525 000</td>
+          <td class="num">825 000</td>
+          <td class="num">1 325 000</td>
+        </tr>
+        <tr>
+          <td>Charges (pub ajustée)</td>
+          <td class="num">420 000</td>
+          <td class="num">470 000</td>
+          <td class="num">580 000</td>
+        </tr>
+        <tr class="total">
+          <td>Résultat</td>
+          <td class="num">+105 000</td>
+          <td class="num">+355 000</td>
+          <td class="num">+745 000</td>
+        </tr>
+        <tr>
+          <td>Résultat annuel</td>
+          <td class="num">1,26 M Ar</td>
+          <td class="num">4,26 M Ar</td>
+          <td class="num">8,94 M Ar</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="tiny">
+      Ce budget n’inclut pas de salaire fondateur : le résultat est ce qui reste pour se rémunérer,
+      réinvestir, ou embaucher. Seuil de rentabilité ≈ 57 garages au total (dont ~37 payants) au mix réaliste.
+    </p>
+  </section>
+
+  <!-- PAGE 5 — Montée en charge -->
+  <section class="page">
+    <div class="hdr">
+      <img src="mekano-logo-doc.png" alt="" />
+      <div class="doc">SIMULATION · 100 GARAGES · P.5</div>
+    </div>
+    <h2>4. Année 1 — on n’a pas 100 garages dès le mois 1</h2>
+    <p class="muted">Montée progressive, même mix d’offres (ARPU 8 250 Ar). Charges plus basses au début (moins de pub / terrain).</p>
+
+    <table class="small-table">
+      <thead>
+        <tr>
+          <th>Mois</th>
+          <th class="num">Garages</th>
+          <th class="num">Recettes</th>
+          <th class="num">Charges</th>
+          <th class="num">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="neg"><td>M1</td><td class="num">15</td><td class="num">123 750</td><td class="num">280 000</td><td class="num">−156 250</td></tr>
+        <tr class="neg"><td>M2</td><td class="num">25</td><td class="num">206 250</td><td class="num">300 000</td><td class="num">−93 750</td></tr>
+        <tr class="neg"><td>M3</td><td class="num">35</td><td class="num">288 750</td><td class="num">320 000</td><td class="num">−31 250</td></tr>
+        <tr class="pos"><td>M4</td><td class="num">48</td><td class="num">396 000</td><td class="num">350 000</td><td class="num">+46 000</td></tr>
+        <tr class="pos"><td>M5</td><td class="num">58</td><td class="num">478 500</td><td class="num">370 000</td><td class="num">+108 500</td></tr>
+        <tr class="pos"><td>M6</td><td class="num">68</td><td class="num">561 000</td><td class="num">390 000</td><td class="num">+171 000</td></tr>
+        <tr class="pos"><td>M7</td><td class="num">76</td><td class="num">627 000</td><td class="num">410 000</td><td class="num">+217 000</td></tr>
+        <tr class="pos"><td>M8</td><td class="num">84</td><td class="num">693 000</td><td class="num">430 000</td><td class="num">+263 000</td></tr>
+        <tr class="pos"><td>M9</td><td class="num">90</td><td class="num">742 500</td><td class="num">445 000</td><td class="num">+297 500</td></tr>
+        <tr class="pos"><td>M10</td><td class="num">95</td><td class="num">783 750</td><td class="num">455 000</td><td class="num">+328 750</td></tr>
+        <tr class="pos"><td>M11</td><td class="num">98</td><td class="num">808 500</td><td class="num">465 000</td><td class="num">+343 500</td></tr>
+        <tr class="pos"><td>M12</td><td class="num">100</td><td class="num">825 000</td><td class="num">470 000</td><td class="num">+355 000</td></tr>
+        <tr class="total">
+          <td>Année 1</td>
+          <td class="num">—</td>
+          <td class="num">6 534 000</td>
+          <td class="num">4 685 000</td>
+          <td class="num">+1 849 000</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="grid-3">
+      <div class="kpi">
+        <div class="label">CA année 1</div>
+        <div class="value">6,53 M Ar</div>
+        <div class="label">avant d’être à 100 garages tout le temps</div>
+      </div>
+      <div class="kpi amber">
+        <div class="label">Seuil de rentabilité</div>
+        <div class="value">Mois 4</div>
+        <div class="label">≈ 48 garages inscrits</div>
+      </div>
+      <div class="kpi ok">
+        <div class="label">CA année 2 (palier)</div>
+        <div class="value">9,90 M Ar</div>
+        <div class="label">si on reste à 100 garages</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      Les 3 premiers mois sont déficitaires (−281 000 Ar au cumul). C’est le coût
+      de lancer la carte. Dès <strong>M4</strong> le modèle devient positif, et l’année 1
+      se termine autour de <strong>+1,85 M Ar</strong> — de quoi se payer un peu et réinvestir.
+    </div>
+  </section>
+
+  <!-- PAGE 6 — Côté garage -->
+  <section class="page">
+    <div class="hdr">
+      <img src="mekano-logo-doc.png" alt="" />
+      <div class="doc">SIMULATION · 100 GARAGES · P.6</div>
+    </div>
+    <h2>5. Côté garage — la dépense est petite</h2>
+    <p class="muted">Pour convaincre un patron d’atelier : Mekano pèse très peu dans son budget, et un seul client en plus paie l’abo.</p>
+
+    <h3>Budget mensuel type d’un petit garage (Tana)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Poste garage</th>
+          <th class="num">Fourchette / mois</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Loyer atelier</td><td class="num">200 000 – 800 000 Ar</td></tr>
+        <tr><td>Salaires (2 à 4 personnes)</td><td class="num">400 000 – 1 200 000 Ar</td></tr>
+        <tr><td>Électricité</td><td class="num">80 000 – 200 000 Ar</td></tr>
+        <tr><td>Eau, internet, divers</td><td class="num">30 000 – 80 000 Ar</td></tr>
+        <tr class="total"><td>Charges fixes (hors pièces)</td><td class="num">≈ 0,7 à 2,3 M Ar</td></tr>
+      </tbody>
+    </table>
+
+    <div class="grid-3">
+      <div class="kpi">
+        <div class="label">Basique dans ce budget</div>
+        <div class="value">0,2 – 0,7 %</div>
+        <div class="label">5 000 Ar / mois</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Standard dans ce budget</div>
+        <div class="value">0,7 – 2 %</div>
+        <div class="label">15 000 Ar / mois</div>
+      </div>
+      <div class="kpi amber">
+        <div class="label">Premium dans ce budget</div>
+        <div class="value">1,3 – 4 %</div>
+        <div class="label">30 000 Ar / mois</div>
+      </div>
+    </div>
+
+    <h3>1 client en plus = l’abonnement est remboursé</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Prestation typique</th>
+          <th class="num">Prix client</th>
+          <th>Offre Mekano couverte</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Vidange</td>
+          <td class="num">50 000 – 80 000 Ar</td>
+          <td>Plus de 1 mois Premium</td>
+        </tr>
+        <tr>
+          <td>Freins / batterie</td>
+          <td class="num">80 000 – 150 000 Ar</td>
+          <td>3 à 10 mois Standard</td>
+        </tr>
+        <tr>
+          <td>Réparation moyenne</td>
+          <td class="num">150 000 – 300 000 Ar</td>
+          <td>5 à 10 mois Premium</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Face à la pub classique</h3>
+    <div class="grid-2">
+      <div class="card">
+        <ul class="feat">
+          <li>500 flyers : 40 000 – 80 000 Ar, jetés en 1 semaine</li>
+          <li>Spot radio 30 s : 150 000 – 400 000 Ar</li>
+          <li>Pubs Facebook brutes : 50 000 – 100 000 Ar / mois, sans carte ni avis</li>
+        </ul>
+      </div>
+      <div class="card" style="background:#F7FBFA;">
+        <p>
+          <strong>Mekano Standard = 15 000 Ar / mois</strong> : fiche, photos, tarifs, promo,
+          visible 24 h / 24 par des gens qui cherchent déjà un garage.
+        </p>
+        <p class="muted" style="margin:0;">C’est 3 à 20 fois moins cher qu’un vrai budget pub, pour un client déjà en intention d’achat.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 7 — Synthèse -->
+  <section class="page">
+    <div class="hdr">
+      <img src="mekano-logo-doc.png" alt="" />
+      <div class="doc">SIMULATION · 100 GARAGES · P.7</div>
+    </div>
+    <h2>6. Synthèse à retenir</h2>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Pour Mekano</h3>
+        <ul class="feat">
+          <li><strong>825 000 Ar / mois</strong> quand 100 garages sont en ligne (mix réaliste).</li>
+          <li><strong>470 000 Ar</strong> de charges → <strong>+355 000 Ar</strong> de résultat.</li>
+          <li>Rentable dès le <strong>4<sup>e</sup> mois</strong>, ~48 garages.</li>
+          <li>Année 1 : <strong>+1,85 M Ar</strong> · année 2 palier : <strong>+4,26 M Ar</strong>.</li>
+          <li>Même le scénario pessimiste reste positif (+105 000 Ar / mois).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Pour le garage</h3>
+        <ul class="feat">
+          <li>L’abo pèse <strong>moins de 4 %</strong> des charges fixes.</li>
+          <li><strong>1 vidange</strong> paie plus d’un mois Premium.</li>
+          <li>Moins cher que flyers, radio ou Facebook ads.</li>
+          <li>L’offre gratuite existe : on peut tester sans risque.</li>
+          <li>Standard (15 000 Ar) est le meilleur rapport qualité / prix à vendre.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Leviers pour dépasser 100 garages</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Levier</th>
+          <th>Effet estimé</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Faire passer 10 Basique → Standard</td>
+          <td>+100 000 Ar / mois</td>
+        </tr>
+        <tr>
+          <td>Faire passer 5 Standard → Premium</td>
+          <td>+75 000 Ar / mois</td>
+        </tr>
+        <tr>
+          <td>Passer de 100 à 150 garages (même mix)</td>
+          <td>+412 500 Ar / mois</td>
+        </tr>
+        <tr>
+          <td>Pack annuel (−1 mois offert)</td>
+          <td>Trésorerie d’avance, un peu moins de CA</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>Hypothèses.</strong> Prix des offres = ceux de l’app (0 / 5 000 / 15 000 / 30 000 Ar).
+      Mix d’adoption et charges d’exploitation = estimations Madagascar 2026, structure légère,
+      sans salaire fondateur. Les offres expirées retombent en gratuit dans l’app : le CA réel
+      dépend du suivi des paiements. Document de simulation, pas un engagement.
+    </div>
+
+    <p class="footer-note">
+      Mekano — Trouvez, contactez et gérez des garages près de chez vous<br />
+      Simulation 100 garages · Octobre 2026
+    </p>
+  </section>
+
+</body>
+</html>

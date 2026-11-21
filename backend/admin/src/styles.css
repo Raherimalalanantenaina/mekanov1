@@ -1091,7 +1091,18 @@ td.actions .btn {
   color: var(--success);
 }
 
+.badge-success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badge-expired {
+  background: var(--warn-soft);
+  color: #8a6d1f;
+}
+
 .badge-hidden,
+.badge-failed,
 .badge-suspended {
   background: var(--danger-soft);
   color: var(--danger);
