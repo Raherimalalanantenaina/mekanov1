@@ -1,0 +1,293 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Mekano — Budget complet 100 garages</title><style>
+    @page { size: A4; margin: 14mm 13mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: #101617;
+      background: #fff;
+      font-size: 10.2pt;
+      line-height: 1.42;
+    }
+    h1, h2, h3 { color: #12717A; margin: 0 0 8px; }
+    h1 { font-size: 24pt; letter-spacing: 0.02em; }
+    h2 {
+      font-size: 14pt;
+      border-bottom: 2px solid #12717A;
+      padding-bottom: 5px;
+      margin-bottom: 12px;
+    }
+    h3 { font-size: 11pt; color: #0B5A62; margin: 12px 0 6px; }
+    p { margin: 0 0 7px; }
+    .muted { color: #5F6B6C; }
+    .tiny { font-size: 8pt; color: #9AA6A7; }
+    .page { page-break-after: always; padding: 2px 0 6px; }
+    .page:last-child { page-break-after: auto; }
+
+    .cover {
+      min-height: 255mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background: radial-gradient(ellipse at 50% 18%, #EAF3F3 0%, #fff 58%);
+    }
+    .cover img { width: 168px; height: auto; margin-bottom: 16px; }
+    .tag {
+      display: inline-block;
+      background: #12717A;
+      color: #fff;
+      font-size: 9.5pt;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin: 10px 0 14px;
+    }
+    .tag.amber { background: #F0A72C; color: #101617; }
+    .cover .subtitle { font-size: 12.5pt; color: #5F6B6C; max-width: 460px; }
+    .cover .hero-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      width: 100%;
+      max-width: 520px;
+      margin-top: 28px;
+    }
+    .cover .hero-kpis .kpi { text-align: center; padding: 12px 8px; }
+    .cover .meta { margin-top: 36px; font-size: 9pt; color: #9AA6A7; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    .card {
+      border: 1px solid #ECEFEF;
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: #fff;
+    }
+    .card h3 { margin-top: 0; }
+    .kpi {
+      border: 1px solid #ECEFEF;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #F7FBFA;
+    }
+    .kpi .value {
+      font-size: 16pt;
+      font-weight: 800;
+      color: #12717A;
+      line-height: 1.15;
+    }
+    .kpi .label { font-size: 8pt; color: #5F6B6C; margin-top: 2px; }
+    .kpi.amber { background: #FBF6EA; }
+    .kpi.amber .value { color: #C77F0F; }
+    .kpi.dark { background: #12717A; color: #fff; }
+    .kpi.dark .value { color: #fff; }
+    .kpi.dark .label { color: #CDE6E1; }
+    .kpi.ok { background: #EAF6EE; }
+    .kpi.ok .value { color: #1B7A46; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 8px 0 10px; }
+    th, td { border: 1px solid #ECEFEF; padding: 6px 8px; text-align: left; }
+    th { background: #EAF3F3; color: #0B5A62; font-weight: 700; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.total td { background: #EAF3F3; font-weight: 800; color: #0B5A62; }
+    tr.neg td { color: #B42318; }
+    tr.pos td { color: #1B7A46; }
+    .plan-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 6px; vertical-align: middle;
+    }
+
+    .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 8.5pt; }
+    .bar-row .name { width: 78px; color: #5F6B6C; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 11px; background: #EAF3F3; border-radius: 6px; overflow: hidden; }
+    .bar-track span { display: block; height: 100%; border-radius: 6px; }
+    .bar-row .n { width: 92px; text-align: right; font-weight: 700; color: #0B5A62; flex-shrink: 0; }
+
+    ul.feat { padding-left: 18px; margin: 4px 0 8px; }
+    ul.feat li { margin-bottom: 4px; }
+    .badge {
+      display: inline-block; background: #FBF1DD; color: #C77F0F;
+      font-size: 8pt; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    }
+    .badge.teal { background: #EAF3F3; color: #12717A; }
+    .note {
+      background: #F7FBFA;
+      border-left: 3px solid #12717A;
+      padding: 8px 10px;
+      border-radius: 0 8px 8px 0;
+      font-size: 9pt;
+      color: #5F6B6C;
+    }
+    .footer-note { margin-top: 10px; font-size: 8pt; color: #9AA6A7; text-align: center; }
+    .hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .hdr img { height: 28px; }
+    .hdr .doc { font-size: 8pt; color: #9AA6A7; font-weight: 700; letter-spacing: 0.04em; }
+    .callout {
+      background: #12717A; color: #fff; border-radius: 12px; padding: 12px 14px;
+      margin: 10px 0;
+    }
+    .callout strong { color: #F0A72C; }
+    .small-table td, .small-table th { padding: 5px 7px; font-size: 8.5pt; }
+  
+  .warn { background:#FBF1DD; border-left:3px solid #C77F0F; padding:8px 10px; border-radius:0 8px 8px 0; font-size:9pt; color:#5a4100; }
+  .warn strong { color:#8a5300; }
+  td.sub, .sub { color:#5F6B6C; font-size:8pt; }
+  tr.section td { background:#F7FBFA; font-weight:800; color:#12717A; font-size:8.5pt; text-transform:uppercase; letter-spacing:.04em; }
+  ul.check { list-style:none; padding-left:0; margin:4px 0 8px; }
+  ul.check li { padding-left:20px; position:relative; margin-bottom:4px; }
+  ul.check li:before { content:"☐"; position:absolute; left:0; color:#12717A; font-weight:700; }
+  .store-head { display:flex; justify-content:space-between; align-items:baseline; }
+  .tight td, .tight th { padding:3.5px 7px; }
+  .tight td .sub { display:inline; margin-left:6px; font-size:7.6pt; }
+  .store-price { font-size:15pt; font-weight:800; color:#12717A; }
+</style></head><body><section class="page cover">
+<img src="mekano-logo-doc.png" alt="Logo Mekano"/>
+<h1>Budget complet</h1><div class="tag">Simulation · 100 garages</div>
+<p class="subtitle">Recettes, toutes les charges, prix du Play Store et de l’App Store, coûts de lancement et tout ce dont l’app a besoin pour être en ligne à Madagascar.</p>
+<div class="hero-kpis">
+ <div class="kpi"><div class="value">825 000</div><div class="label">Ar / mois de recettes</div></div>
+ <div class="kpi amber"><div class="value">512 375</div><div class="label">Ar / mois de charges</div></div>
+ <div class="kpi ok"><div class="value">+312 625</div><div class="label">Ar / mois de résultat</div></div>
+</div>
+<div class="hero-kpis" style="margin-top:12px">
+ <div class="kpi"><div class="value">1,11 M</div><div class="label">Ar pour lancer (une fois)</div></div>
+ <div class="kpi"><div class="value">112 500</div><div class="label">Ar · Google Play (une fois)</div></div>
+ <div class="kpi"><div class="value">445 500</div><div class="label">Ar / an · App Store</div></div>
+</div>
+<div class="meta">Mekano · Novembre 2026 · 1 $ ≈ 4 500 Ar<br/>Document de simulation, pas un bilan réel</div>
+</section><section class="page"><div class="hdr"><img src="mekano-logo-doc.png" alt=""/><span class="doc">BUDGET COMPLET · 100 GARAGES · P.2</span></div>
+<h2>1. Ce que rapportent 100 garages</h2>
+<p class="muted">Prix des offres actuellement dans l’app. Le paiement se fait maintenant <strong>dans l’app</strong> par MVola, Orange Money ou Airtel Money, et l’offre s’active toute seule.</p>
+<table><thead><tr><th>Offre</th><th class="num">Prix / mois</th><th class="num">Pessimiste</th><th class="num">Réaliste</th><th class="num">Optimiste</th></tr></thead><tbody><tr><td><span class="plan-dot" style="background:#9AA6A7"></span>Gratuite</td><td class="num">0 Ar</td><td class="num">50</td><td class="num">35</td><td class="num">20</td></tr><tr><td><span class="plan-dot" style="background:#7FB8BE"></span>Basique</td><td class="num">5 000 Ar</td><td class="num">30</td><td class="num">30</td><td class="num">25</td></tr><tr><td><span class="plan-dot" style="background:#12717A"></span>Standard</td><td class="num">15 000 Ar</td><td class="num">15</td><td class="num">25</td><td class="num">30</td></tr><tr><td><span class="plan-dot" style="background:#F0A72C"></span>Premium</td><td class="num">30 000 Ar</td><td class="num">5</td><td class="num">10</td><td class="num">25</td></tr><tr class="total"><td>Recettes / mois</td><td></td><td class="num">525 000 Ar</td><td class="num">825 000 Ar</td><td class="num">1 325 000 Ar</td></tr><tr><td>Recettes / an</td><td></td><td class="num">6,30 M Ar</td><td class="num">9,90 M Ar</td><td class="num">15,90 M Ar</td></tr></tbody></table>
+<div class="grid-3">
+ <div class="kpi"><div class="value">525 000</div><div class="label">Ar / mois · 50 garages payants</div></div>
+ <div class="kpi dark"><div class="value">825 000</div><div class="label">Ar / mois · 65 payants (base du document)</div></div>
+ <div class="kpi"><div class="value">1 325 000</div><div class="label">Ar / mois · 80 garages payants</div></div>
+</div>
+<h3>D’où vient la recette (scénario réaliste)</h3><div class="bar-row"><span class="name">Basique</span><div class="bar-track"><span style="width:18%;background:#7FB8BE"></span></div><span class="n">150 k · 18 %</span></div><div class="bar-row"><span class="name">Standard</span><div class="bar-track"><span style="width:45%;background:#12717A"></span></div><span class="n">375 k · 45 %</span></div><div class="bar-row"><span class="name">Premium</span><div class="bar-track"><span style="width:36%;background:#F0A72C"></span></div><span class="n">300 k · 36 %</span></div>
+<p class="note">Revenu moyen : <strong>8 250 Ar</strong> par garage et par mois, soit 12 692 Ar par garage payant. Les 35 garages gratuits ne rapportent rien directement, mais ils remplissent la carte et attirent les automobilistes.</p>
+</section><section class="page"><div class="hdr"><img src="mekano-logo-doc.png" alt=""/><span class="doc">BUDGET COMPLET · 100 GARAGES · P.3</span></div>
+<h2>2. Coûts de lancement (une seule fois)</h2>
+<p class="muted">Ce qu’il faut payer avant que le premier garage puisse s’abonner.</p>
+<table><thead><tr><th>Poste</th><th class="num">Montant</th></tr></thead><tbody><tr><td><strong>Compte développeur Google Play</strong><div class="sub">25 $ une seule fois</div></td><td class="num">112 500 Ar</td></tr><tr><td><strong>Apple Developer Program (1re année)</strong><div class="sub">99 $ / an · à renouveler chaque année</div></td><td class="num">445 500 Ar</td></tr><tr><td><strong>Nom de domaine (1re année)</strong><div class="sub">≈ 12 $</div></td><td class="num">54 000 Ar</td></tr><tr><td><strong>Création de la société</strong><div class="sub">EDBM, statuts, NIF / STAT (nécessaires pour les contrats marchands)</div></td><td class="num">300 000 Ar</td></tr><tr><td><strong>Contrats marchands mobile money</strong><div class="sub">MVola, Orange Money, Airtel Money · frais de dossier selon opérateur</div></td><td class="num">0 Ar</td></tr><tr><td><strong>Visuels des stores</strong><div class="sub">Icône, captures d’écran, bannière : faits maison</div></td><td class="num">0 Ar</td></tr><tr><td><strong>Campagne de lancement</strong><div class="sub">Premier mois de pub + flyers pour les garages</div></td><td class="num">200 000 Ar</td></tr>
+<tr class="total"><td>Total lancement</td><td class="num">1 112 000 Ar</td></tr></tbody></table>
+<div class="grid-3">
+ <div class="kpi"><div class="value">666 500</div><div class="label">Ar · Android seul (sans Apple)</div></div>
+ <div class="kpi dark"><div class="value">1 112 000</div><div class="label">Ar · Android + iPhone</div></div>
+ <div class="kpi amber"><div class="value">+800 000</div><div class="label">Ar · iPhone de test d’occasion (facultatif)</div></div>
+</div>
+<h3>Déjà payé ou gratuit</h3>
+<ul class="feat">
+ <li><strong>Développement de l’app</strong> : déjà fait (app mobile, serveur, site admin, paiement mobile money).</li>
+ <li><strong>Pas besoin de Mac</strong> : Expo EAS construit la version iPhone sur ses serveurs.</li>
+ <li><strong>Téléphone Android de test</strong> : ton téléphone actuel suffit.</li>
+ <li><strong>Compte Expo, GitHub, Firebase</strong> : gratuits.</li>
+</ul>
+<p class="note">Le compte Apple se renouvelle chaque année (445 500 Ar). Si la version iPhone n’est pas prioritaire, commence par Android seul : 666 500 Ar au lieu de 1 112 000 Ar.</p>
+</section><section class="page"><div class="hdr"><img src="mekano-logo-doc.png" alt=""/><span class="doc">BUDGET COMPLET · 100 GARAGES · P.4</span></div>
+<h2>3. Play Store, App Store ou APK direct</h2>
+<div class="grid-3">
+ <div class="card"><div class="store-head"><h3>Google Play</h3></div><div class="store-price">112 500 Ar</div><div class="sub">25 $ une seule fois, à vie</div>
+  <ul class="feat">
+   <li>Publication en quelques jours</li>
+   <li>Compte personnel récent : <strong>test fermé avec 12 testeurs pendant 14 jours</strong> avant la mise en ligne publique</li>
+   <li>Vérification d’identité obligatoire</li>
+   <li>Commission : <strong>15 %</strong> sur les abonnements vendus par Google</li>
+  </ul></div>
+ <div class="card"><div class="store-head"><h3>App Store</h3></div><div class="store-price">445 500 Ar</div><div class="sub">99 $ par an</div>
+  <ul class="feat">
+   <li>Relecture Apple de 1 à 3 jours à chaque version</li>
+   <li>Compte société : numéro D-U-N-S (gratuit)</li>
+   <li>Suppression du compte possible dans l’app (exigée)</li>
+   <li>Commission : <strong>15 %</strong> (petites entreprises), 30 % sinon</li>
+  </ul></div>
+ <div class="card"><div class="store-head"><h3>APK direct</h3></div><div class="store-price">0 Ar</div><div class="sub">Facebook, WhatsApp, site web</div>
+  <ul class="feat">
+   <li>Disponible tout de suite (build EAS « preview »)</li>
+   <li>Aucune commission</li>
+   <li>Android seulement</li>
+   <li>Moins de confiance, pas de mise à jour automatique</li>
+  </ul></div>
+</div>
+<h3>Point important : le paiement des offres dans les stores</h3>
+<div class="warn">Google et Apple demandent en principe que les <strong>services numériques vendus dans l’app</strong> (comme une offre qui débloque des fonctions) passent par leur propre système de paiement, avec leur commission. Le paiement MVola / Orange / Airtel dans l’app risque donc d’être refusé à la relecture, surtout chez Apple. Les règles évoluent : à vérifier au moment de publier.</div>
+<table class="small-table"><thead><tr><th>Option</th><th>Effet</th><th class="num">Coût / mois à 100 garages</th></tr></thead><tbody>
+<tr><td><strong>APK direct</strong> avec paiement mobile money dans l’app</td><td>Fonctionne déjà, zéro commission</td><td class="num">0 Ar</td></tr>
+<tr><td><strong>Version store sans bouton de paiement</strong> : les garages paient sur une page web Mekano ou auprès d’un agent</td><td>Accepté par les stores, garde le mobile money</td><td class="num">0 Ar</td></tr>
+<tr class="neg"><td><strong>Paiement Google / Apple</strong> dans l’app</td><td>Carte bancaire nécessaire, peu courante chez les garagistes</td><td class="num">−123 750 Ar</td></tr>
+</tbody></table>
+<p class="note">Recommandation : lancer avec l’<strong>APK direct</strong> (Android est majoritaire à Madagascar), puis publier sur les stores une version où le paiement passe par une page web.</p>
+</section><section class="page"><div class="hdr"><img src="mekano-logo-doc.png" alt=""/><span class="doc">BUDGET COMPLET · 100 GARAGES · P.5</span></div>
+<h2>4. Toutes les charges à 100 garages</h2>
+<p class="muted">Charges mensuelles, structure légère (fondateur seul, app déjà développée). Montants en Ariary.</p>
+<table class="small-table tight"><thead><tr><th>Poste</th><th class="num">Ar / mois</th></tr></thead><tbody><tr class="section"><td colspan="2">Technique (app en ligne 24 h/24)</td></tr><tr><td><strong>Serveur API Render « Starter »</strong><div class="sub">7 $ / mois · toujours allumé (indispensable pour les notifications de paiement)</div></td><td class="num">31 500</td></tr><tr><td><strong>Base PostgreSQL Render</strong><div class="sub">≈ 7 $ / mois · 1 Go (fiches, photos, devis, paiements)</div></td><td class="num">31 500</td></tr><tr><td><strong>Nom de domaine .com</strong><div class="sub">≈ 12 $ / an, amorti</div></td><td class="num">4 500</td></tr><tr><td><strong>Apple Developer Program</strong><div class="sub">99 $ / an, amorti (seulement si version iPhone)</div></td><td class="num">37 125</td></tr><tr><td><strong>Expo EAS (builds de l’app)</strong><div class="sub">Plan gratuit suffisant · 19 $ / mois si besoin de plus de builds</div></td><td class="num">0</td></tr><tr><td><strong>Notifications push</strong><div class="sub">Expo Push + Firebase Cloud Messaging : gratuits</div></td><td class="num">0</td></tr><tr><td><strong>Cartes et itinéraires</strong><div class="sub">OpenFreeMap + OSRM public : gratuits</div></td><td class="num">0</td></tr><tr><td><strong>Emails</strong><div class="sub">SMTP Gmail ou Brevo (offre gratuite)</div></td><td class="num">0</td></tr><tr class="section"><td colspan="2">Encaissements et fiscalité</td></tr><tr><td><strong>Frais mobile money</strong><div class="sub">≈ 2 % des encaissements (MVola / Orange / Airtel, à négocier)</div></td><td class="num">16 500</td></tr><tr><td><strong>Impôt synthétique</strong><div class="sub">≈ 5 % du chiffre d’affaires (petite entreprise, à confirmer)</div></td><td class="num">41 250</td></tr><tr><td><strong>Frais bancaires</strong><div class="sub">Compte professionnel</div></td><td class="num">10 000</td></tr><tr class="section"><td colspan="2">Fonctionnement</td></tr><tr><td><strong>Internet et téléphone</strong><div class="sub">Support garages, forfaits data</div></td><td class="num">50 000</td></tr><tr><td><strong>Publicité</strong><div class="sub">Facebook / TikTok, ciblage garages et automobilistes</div></td><td class="num">180 000</td></tr><tr><td><strong>Terrain</strong><div class="sub">Visites des garages, carburant, déplacements</div></td><td class="num">80 000</td></tr><tr><td><strong>Imprévus</strong><div class="sub">Marge de sécurité</div></td><td class="num">30 000</td></tr>
+<tr class="total"><td>Total des charges</td><td class="num">512 375 Ar</td></tr></tbody></table>
+<div class="grid-3">
+ <div class="kpi"><div class="value">825 000</div><div class="label">Recettes / mois</div></div>
+ <div class="kpi amber"><div class="value">512 375</div><div class="label">Charges / mois</div></div>
+ <div class="kpi ok"><div class="value">+312 625</div><div class="label">Résultat / mois · 3,75 M Ar / an · marge 38 %</div></div>
+</div>
+<p class="note">La technique ne pèse que <strong>104 625 Ar / mois</strong> : l’essentiel des charges, c’est la pub et le terrain. Android seul (sans Apple) : charges de 475 250 Ar, résultat de +349 750 Ar / mois. Le budget ne comprend <strong>pas de salaire</strong> : le résultat sert à se rémunérer et à réinvestir.</p>
+</section><section class="page"><div class="hdr"><img src="mekano-logo-doc.png" alt=""/><span class="doc">BUDGET COMPLET · 100 GARAGES · P.6</span></div>
+<h2>5. Année 1, mois par mois</h2>
+<p class="muted">Montée progressive jusqu’à 100 garages, même mix d’offres. La pub et le terrain augmentent avec le nombre de garages.</p>
+<table class="small-table"><thead><tr><th>Mois</th><th class="num">Garages</th><th class="num">Recettes</th><th class="num">Charges</th><th class="num">Résultat</th></tr></thead><tbody><tr class="neg"><td>M1</td><td class="num">15</td><td class="num">123 750</td><td class="num">303 788</td><td class="num">−180 038</td></tr><tr class="neg"><td>M2</td><td class="num">25</td><td class="num">206 250</td><td class="num">324 062</td><td class="num">−117 812</td></tr><tr class="neg"><td>M3</td><td class="num">35</td><td class="num">288 750</td><td class="num">344 338</td><td class="num">−55 588</td></tr><tr class="pos"><td>M4</td><td class="num">48</td><td class="num">396 000</td><td class="num">366 345</td><td class="num">+29 655</td></tr><tr class="pos"><td>M5</td><td class="num">58</td><td class="num">478 500</td><td class="num">386 620</td><td class="num">+91 880</td></tr><tr class="pos"><td>M6</td><td class="num">68</td><td class="num">561 000</td><td class="num">406 895</td><td class="num">+154 105</td></tr><tr class="pos"><td>M7</td><td class="num">76</td><td class="num">627 000</td><td class="num">426 015</td><td class="num">+200 985</td></tr><tr class="pos"><td>M8</td><td class="num">84</td><td class="num">693 000</td><td class="num">445 135</td><td class="num">+247 865</td></tr><tr class="pos"><td>M9</td><td class="num">90</td><td class="num">742 500</td><td class="num">463 100</td><td class="num">+279 400</td></tr><tr class="pos"><td>M10</td><td class="num">95</td><td class="num">783 750</td><td class="num">480 488</td><td class="num">+303 262</td></tr><tr class="pos"><td>M11</td><td class="num">98</td><td class="num">808 500</td><td class="num">496 720</td><td class="num">+311 780</td></tr><tr class="pos"><td>M12</td><td class="num">100</td><td class="num">825 000</td><td class="num">512 375</td><td class="num">+312 625</td></tr>
+<tr class="total"><td>Année 1</td><td class="num">—</td><td class="num">6 534 000</td><td class="num">4 955 880</td><td class="num">+1 578 120</td></tr></tbody></table>
+<div class="grid-3">
+ <div class="kpi"><div class="value">6,53 M Ar</div><div class="label">Recettes année 1</div></div>
+ <div class="kpi amber"><div class="value">M4</div><div class="label">Premier mois rentable · 48 garages</div></div>
+ <div class="kpi ok"><div class="value">0,47 M Ar</div><div class="label">Année 1 après les coûts de lancement</div></div>
+</div>
+<h3>Les 3 scénarios à 100 garages</h3>
+<table class="small-table"><thead><tr><th></th><th class="num">Pessimiste</th><th class="num">Réaliste</th><th class="num">Optimiste</th></tr></thead><tbody><tr><td>Recettes</td><td class="num">525 000</td><td class="num">825 000</td><td class="num">1 325 000</td></tr><tr><td>Charges</td><td class="num">441 375</td><td class="num">512 375</td><td class="num">657 375</td></tr><tr class="total"><td>Résultat / mois</td><td class="num">+83 625</td><td class="num">+312 625</td><td class="num">+667 625</td></tr><tr><td>Résultat / an</td><td class="num">1,00 M Ar</td><td class="num">3,75 M Ar</td><td class="num">8,01 M Ar</td></tr></tbody></table>
+<p class="note">3 premiers mois déficitaires (−353 438 Ar au cumul). Prévoir environ <strong>1,47 M Ar</strong> de trésorerie de départ (lancement + premiers mois).</p>
+</section><section class="page"><div class="hdr"><img src="mekano-logo-doc.png" alt=""/><span class="doc">BUDGET COMPLET · 100 GARAGES · P.7</span></div>
+<h2>6. Tout ce dont l’app a besoin</h2>
+<div class="grid-2">
+ <div class="card"><h3>Comptes à ouvrir</h3><ul class="check">
+  <li>Google Play Console (112 500 Ar)</li>
+  <li>Apple Developer (445 500 Ar / an), si version iPhone</li>
+  <li>Expo / EAS (gratuit) : déjà fait</li>
+  <li>Render : passer l’API au plan Starter (toujours allumé)</li>
+  <li>Développeur MVola, Orange Developer, Airtel Africa Developers</li>
+  <li>Email d’envoi (Gmail avec mot de passe d’application, ou Brevo)</li>
+ </ul></div>
+ <div class="card"><h3>Administratif</h3><ul class="check">
+  <li>Société créée (EDBM), NIF et STAT</li>
+  <li>Compte bancaire professionnel</li>
+  <li>Contrat marchand MVola (Yas)</li>
+  <li>Contrat marchand Orange Money</li>
+  <li>Contrat marchand Airtel Money</li>
+  <li>Déclaration de l’impôt synthétique</li>
+ </ul></div>
+ <div class="card"><h3>Pour les stores</h3><ul class="check">
+  <li>Politique de confidentialité en ligne (lien public)</li>
+  <li>Conditions d’utilisation</li>
+  <li>Suppression du compte depuis l’app</li>
+  <li>Icône 512 × 512, bannière 1024 × 500 (Play)</li>
+  <li>Captures d’écran téléphone (FR, MG)</li>
+  <li>Description courte et longue, catégorie « Auto et véhicules »</li>
+  <li>Formulaire « Sécurité des données » (Play) et « Confidentialité » (Apple)</li>
+  <li>12 testeurs pendant 14 jours (Play, compte personnel)</li>
+ </ul></div>
+ <div class="card"><h3>Technique avant le lancement</h3><ul class="check">
+  <li>Variables de paiement remplies sur Render</li>
+  <li>PUBLIC_URL en https</li>
+  <li>Adresse de notification déclarée chez Airtel</li>
+  <li>Test sandbox de chaque opérateur, puis passage en production</li>
+  <li>Sauvegarde régulière de la base de données</li>
+  <li>PAYMENT_SIMULATION=0 en production</li>
+  <li>Plus tard : serveur d’itinéraires OSRM à soi (≈ 67 500 Ar / mois) si le trafic augmente</li>
+ </ul></div>
+</div>
+<p class="footer-note" style="text-align:left">Hypothèses : 1 $ ≈ 4 500 Ar. Prix Google Play, Apple, Render et Expo d’après leurs grilles publiques ; ils peuvent changer. Frais mobile money (≈ 2 %), impôt synthétique (≈ 5 %) et coût de création de société sont des estimations à confirmer auprès des opérateurs et d’un comptable. Mix d’adoption et charges de fonctionnement : estimations Madagascar 2026. Document de simulation, pas un engagement.</p>
+<p class="footer-note">Mekano — Trouvez, contactez et gérez des garages près de chez vous · Budget complet 100 garages · Novembre 2026</p>
+</section></body></html>

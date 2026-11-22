@@ -353,19 +353,6 @@ export async function updateGarage(
   return garage;
 }
 
-/** Demande d'offre : le super admin l'active après réception du paiement. */
-export async function requestPlan(id: string, plan: PlanId): Promise<Garage> {
-  return api<Garage>(
-    `/api/garages/${id}/plan-request`,
-    { method: 'POST', body: JSON.stringify({ plan }) },
-    true
-  );
-}
-
-export async function cancelPlanRequest(id: string): Promise<Garage> {
-  return api<Garage>(`/api/garages/${id}/plan-request`, { method: 'DELETE' }, true);
-}
-
 /** Opérateurs mobile money disponibles (MVola, Orange Money, Airtel Money). */
 export async function fetchPaymentProviders(): Promise<PaymentProviderInfo[]> {
   return api<PaymentProviderInfo[]>('/api/payments/providers');

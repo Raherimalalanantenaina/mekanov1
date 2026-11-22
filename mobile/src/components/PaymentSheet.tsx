@@ -47,15 +47,15 @@ export function PaymentSheet({
   providers,
   onClose,
   onPaid,
-  onOther,
+  loading = false,
 }: {
   garage: Garage;
   plan: PlanId | null;
   providers: PaymentProviderInfo[];
   onClose: () => void;
   onPaid: () => void;
-  /** Paiement hors mobile money : demande manuelle au super admin. */
-  onOther?: (plan: PlanId) => void;
+  /** Liste des opérateurs encore en chargement. */
+  loading?: boolean;
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -84,6 +84,12 @@ export function PaymentSheet({
     paidRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan]);
+
+  // Opérateurs reçus après l'ouverture : on présélectionne le bon
+  useEffect(() => {
+    if (plan && !providers.some((p) => p.id === providerId)) setProviderId(guessProvider());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providers]);
 
   const provider = providers.find((p) => p.id === providerId);
   const price = plan ? config.plans[plan].price : 0;
@@ -168,7 +174,22 @@ export function PaymentSheet({
             </Pressable>
           </View>
 
-          {!payment || status === 'failed' || status === 'expired' ? (
+          {!payment && providers.length === 0 ? (
+            // Aucun opérateur : chargement, hors ligne ou paiement pas encore configuré
+            <View style={styles.center}>
+              {loading ? (
+                <ActivityIndicator size="large" color={colors.teal} />
+              ) : (
+                <>
+                  <Ionicons name="cloud-offline-outline" size={40} color={colors.faint} />
+                  <Text style={styles.waitText}>{t('payNoProvider')}</Text>
+                  <BouncyPressable onPress={onClose} style={[styles.btn, styles.btnOutline]}>
+                    <Text style={[styles.btnText, { color: colors.teal }]}>{t('payClose')}</Text>
+                  </BouncyPressable>
+                </>
+              )}
+            </View>
+          ) : !payment || status === 'failed' || status === 'expired' ? (
             <>
               {payment && (
                 <View style={[styles.banner, { backgroundColor: colors.dangerSoft }]}>
@@ -244,11 +265,6 @@ export function PaymentSheet({
                 <Ionicons name="shield-checkmark-outline" size={14} color={colors.muted} />
                 <Text style={styles.secure}>{t('paySecure')}</Text>
               </View>
-              {onOther && plan && (
-                <Text style={styles.other} onPress={() => onOther(plan)}>
-                  {t('payOther')}
-                </Text>
-              )}
             </>
           ) : status === 'pending' ? (
             <View style={styles.center}>
@@ -367,7 +383,6 @@ const createStyles = (colors: ThemeColors) =>
     center: { alignItems: 'center', paddingVertical: 12 },
     waitTitle: { color: colors.ink, fontSize: 16.5, fontWeight: font.black, marginTop: 14 },
     waitText: { color: colors.muted, fontSize: 13.5, lineHeight: 19, textAlign: 'center', marginTop: 6 },
-    other: { color: colors.teal, fontSize: 12.5, fontWeight: font.bold, textAlign: 'center', marginTop: 14 },
     ref: { color: colors.faint, fontSize: 11.5, marginTop: 12 },
     successIcon: {
       width: 64,

@@ -1,36 +1,36 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { cancelPlanRequest, fetchPaymentProviders, requestPlan } from '../api/client';
+import { fetchPaymentProviders } from '../api/client';
 import { PLAN_FEATURES, PLAN_IDS, planName, useAppConfig } from '../appConfig';
 import { useTheme } from '../context/ThemeContext';
 import { useI18n, type TKey } from '../i18n';
 import { font, radii, type ThemeColors } from '../theme';
 import type { Garage, PaymentProviderInfo, PlanId } from '../types';
 import { BouncyPressable } from './Pressable';
-import { notify } from './Notifier';
 import { PaymentSheet } from './PaymentSheet';
 
 /**
- * « Mon offre » : offre en cours et paiement mobile money (MVola, Orange Money,
- * Airtel Money) qui active l'offre aussitôt. Sans opérateur configuré, on garde
- * la demande manuelle activée par le super admin.
+ * « Mon offre » : offre en cours et achat immédiat par mobile money
+ * (MVola, Orange Money, Airtel Money). L'offre s'active dès que l'opérateur
+ * confirme le paiement.
  */
 export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: () => void }) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { t, lang } = useI18n();
   const { config } = useAppConfig();
-  const [busy, setBusy] = useState(false);
   const [providers, setProviders] = useState<PaymentProviderInfo[]>([]);
+  const [providersLoaded, setProvidersLoaded] = useState(false);
   const [paying, setPaying] = useState<PlanId | null>(null);
 
-  useEffect(() => {
+  const loadProviders = useCallback(() => {
     fetchPaymentProviders()
       .then(setProviders)
-      .catch(() => setProviders([]));
+      .catch(() => setProviders([]))
+      .finally(() => setProvidersLoaded(true));
   }, []);
-  const canPay = providers.length > 0;
+  useEffect(loadProviders, [loadProviders]);
   const onPaid = useCallback(() => onChanged(), [onChanged]);
 
   const current: PlanId = garage.plan ?? 'free';
@@ -42,43 +42,10 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
       ? `${config.plans[id].price.toLocaleString('fr-FR')} ${t('perMonth')}`
       : t('planFree');
 
-  const onChoose = (id: PlanId) => (canPay ? setPaying(id) : onRequest(id));
-
-  const onRequest = (id: PlanId) => {
-    notify.alert(
-      t('planRequestTitle', { p: planName(config, id, lang) }),
-      t('planRequestText', { price: price(id) }),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('planRequest'),
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await requestPlan(garage.id, id);
-              notify.success(t('planRequested'), t('planRequestSent'));
-              onChanged();
-            } catch (e) {
-              notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const onCancel = async () => {
-    setBusy(true);
-    try {
-      await cancelPlanRequest(garage.id);
-      onChanged();
-    } catch (e) {
-      notify.error(t('error'), e instanceof Error ? e.message : t('fail'));
-    } finally {
-      setBusy(false);
-    }
+  const onBuy = (id: PlanId) => {
+    // Hors ligne au chargement de l'écran : on retente au moment d'acheter
+    if (providers.length === 0) loadProviders();
+    setPaying(id);
   };
 
   return (
@@ -104,22 +71,10 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
           <Text style={styles.pendingText}>{t('planEndsSoon', { n: Math.max(daysLeft, 0) })}</Text>
         </View>
       )}
-      {garage.planRequest && (
-        <View style={styles.pendingBox}>
-          <Ionicons name="hourglass-outline" size={15} color={colors.amberDark} />
-          <Text style={styles.pendingText}>
-            {t('planPendingInfo', { p: planName(config, garage.planRequest, lang) })}
-          </Text>
-          <Text style={styles.link} onPress={busy ? undefined : onCancel}>
-            {t('planCancelRequest')}
-          </Text>
-        </View>
-      )}
 
       {PLAN_IDS.map((id) => {
         const plan = config.plans[id];
         const isCurrent = id === current;
-        const isRequested = id === garage.planRequest;
         return (
           <View key={id} style={[styles.card, isCurrent && styles.cardCurrent]}>
             <View style={styles.cardHead}>
@@ -146,31 +101,20 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
                 </Text>
               </View>
             ))}
-            {isCurrent && id !== 'free' && !isRequested && daysLeft != null && daysLeft <= 7 ? (
-              <BouncyPressable
-                onPress={() => onChoose(id)}
-                disabled={busy}
-                style={[styles.btn, busy && { opacity: 0.6 }]}
-              >
-                <Text style={styles.btnText}>{t('planRenew')}</Text>
+            {id === 'free' ? (
+              isCurrent ? (
+                <View style={[styles.btn, styles.btnCurrent]}>
+                  <Text style={[styles.btnText, { color: colors.teal }]}>{t('currentPlan')}</Text>
+                </View>
+              ) : null
+            ) : (
+              // Offre payante : achat immédiat (ou prolongation d'un mois si c'est l'offre en cours)
+              <BouncyPressable onPress={() => onBuy(id)} style={styles.btn}>
+                <Text style={styles.btnText}>
+                  {isCurrent ? t('planRenew') : t('payBtn')} · {config.plans[id].price.toLocaleString('fr-FR')} Ar
+                </Text>
               </BouncyPressable>
-            ) : isCurrent ? (
-              <View style={[styles.btn, styles.btnCurrent]}>
-                <Text style={[styles.btnText, { color: colors.teal }]}>{t('currentPlan')}</Text>
-              </View>
-            ) : isRequested && !canPay ? (
-              <View style={[styles.btn, styles.btnCurrent]}>
-                <Text style={[styles.btnText, { color: colors.amberDark }]}>{t('planRequested')}</Text>
-              </View>
-            ) : id !== 'free' ? (
-              <BouncyPressable
-                onPress={() => onChoose(id)}
-                disabled={busy}
-                style={[styles.btn, busy && { opacity: 0.6 }]}
-              >
-                <Text style={styles.btnText}>{canPay ? t('payBtn') : t('planRequest')}</Text>
-              </BouncyPressable>
-            ) : null}
+            )}
           </View>
         );
       })}
@@ -179,12 +123,9 @@ export function PlanSection({ garage, onChanged }: { garage: Garage; onChanged: 
         garage={garage}
         plan={paying}
         providers={providers}
+        loading={!providersLoaded}
         onClose={() => setPaying(null)}
         onPaid={onPaid}
-        onOther={(id) => {
-          setPaying(null);
-          onRequest(id);
-        }}
       />
     </View>
   );
@@ -223,7 +164,6 @@ const createStyles = (colors: ThemeColors) =>
       marginBottom: 10,
     },
     pendingText: { color: colors.ink, fontSize: 12.5, fontWeight: font.bold, flex: 1 },
-    link: { color: colors.teal, fontSize: 12.5, fontWeight: font.bold },
     card: {
       borderWidth: 1,
       borderColor: colors.line,
